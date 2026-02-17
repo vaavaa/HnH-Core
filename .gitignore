@@ -1,2 +1,17 @@
 # Virtual environment (used for specify-cli)
 .venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+.pytest_cache/
