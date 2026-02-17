@@ -113,3 +113,14 @@
 - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
 - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
+
+## Constitution Alignment *(HnH)*
+
+<!-- Verify this feature aligns with `.specify/memory/constitution.md` -->
+
+- [ ] **Deterministic Mode**: Spec supports reproducible behavior (seed/time injection, replay) where applicable.
+- [ ] **Identity/Core / Memory / Interface**: No requirement embeds personality logic in prompts or violates Identity/Dynamic State/Relational Memory/Behavioral Interface invariants.
+- [ ] **Parameterization**: Any symbolic inputs (e.g. astrological) map to measurable parameters; no symbolic-only behavior.
+- [ ] **Observability**: Spec calls out snapshot export, introspection, or replay where relevant.
+- [ ] **Ethical guardrails**: Does not claim consciousness, obscure artificial nature, or encourage emotional dependency patterns.
+- [ ] **Non-goals**: Feature is not a horoscope generator, chatbot wrapper, prompt toolkit, or roleplay framework; it fits the deterministic personality simulation engine scope.

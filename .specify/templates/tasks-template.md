@@ -157,6 +157,14 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
 
+### Constitution Compliance (HnH)
+
+*Per `.specify/memory/constitution.md` §8.3 – all feature specs MUST include:*
+
+- [ ] **Deterministic Mode compliance**: Tests or manual check that seed/time injection and replay work; no unseeded randomness in core.
+- [ ] **Identity/Core separation validation**: Identity Core immutable; Dynamic State / Relational Memory / Behavioral Interface boundaries respected.
+- [ ] **Logging validation**: State transitions and observability (snapshot, introspection, parameter diff) implemented and verifiable.
+
 ---
 
 ## Dependencies & Execution Order

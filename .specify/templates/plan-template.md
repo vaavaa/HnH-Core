@@ -31,7 +31,14 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify against `.specify/memory/constitution.md` (HnH Constitution):
+
+- [ ] **Deterministic Mode**: All randomness seeded; seed and time injectable; state transitions logged; replayable step-by-step. No non-deterministic code in core.
+- [ ] **Identity/Core separation**: Identity Core immutable; Dynamic State does not mutate Core; Relational Memory user-scoped; Behavioral Interface has no personality logic.
+- [ ] **Minimal Reference Implementation**: Plan supports (or does not block) a reference implementation without LLM/external APIs, with structured logging and deterministic replay.
+- [ ] **Behavioral Parameterization**: Symbolic constructs map to measurable parameters; no symbolic-only logic.
+- [ ] **Logging & Observability**: Identity snapshot export, state introspection, parameter diffing supported or planned.
+- [ ] **Repository Standards**: Single primary language, one formatter/linter/test framework; external contracts documented, versioned, test-covered.
 
 ## Project Structure
 
