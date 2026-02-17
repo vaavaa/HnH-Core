@@ -128,3 +128,5 @@ It is presence.
 🛠 Constitution-driven architecture  
 
 Contributions, ideas, and research references are welcome.
+
+**User guides:** [Руководство (RU)](user-guide-readme.md) · [User guide (EN)](en-user-guide-readme.md)
