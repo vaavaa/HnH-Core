@@ -164,15 +164,17 @@
 
 ## Future (Out of Scope for 001)
 
-*These phases are not part of spec 001; implement in a later feature.*
+*Implemented as optional extension; not required for spec 001.*
 
-### Phase 5 (Future) — LLM Behavioral Adapter
+### Phase 5 (Future) — LLM Behavioral Adapter ✅
 
+- **Implemented**: `hnh/interface/llm_adapter.py` — `LLMAdapter` protocol, `MockLLMAdapter`, `LessonContext`; behavioral vector injection; mock test harness in `tests/unit/test_llm_adapter.py`. Teacher scenario: lesson context + relational summary + vector → style payload; observable style shift (different vector → different payload).
 - Adapter layer: behavioral vector injection; personality logic separate from prompt; LLM adapter optional; mock LLM test harness.
 - Teacher scenario: lesson context structure; inject relational summary and behavioral vector; validate observable style shift.
 
-### Phase 6 (Future) — Teacher MVP Deployment
+### Phase 6 (Future) — Teacher MVP Deployment ✅
 
+- **Implemented**: `hnh/interface/teacher.py` — `PlanetaryTeacher`, `create_planetary_teacher(label, birth, lat, lon, base_traits?)`, `state_for_date()`, `pilot_run(teacher, start, end, seed, step_days)`. CLI simulation (Phase 7) already provides date/vector/modifiers/replay.
 - CLI simulation for specific date; print vector and modifiers; replay flag.
 - Instantiate first Planetary Teacher; fix birth date; daily modulation; internal logs; 2–4 week pilot.
 
