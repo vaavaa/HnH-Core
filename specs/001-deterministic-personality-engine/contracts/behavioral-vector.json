@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BehavioralVector",
+  "description": "Fixed set of 7 dimensions for HnH v0.1 (spec 001). All values normalized [0.0, 1.0]. Reject out-of-range; no clamp.",
+  "type": "object",
+  "required": [
+    "warmth",
+    "strictness",
+    "verbosity",
+    "correction_rate",
+    "humor_level",
+    "challenge_intensity",
+    "pacing"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "warmth": { "type": "number", "minimum": 0, "maximum": 1 },
+    "strictness": { "type": "number", "minimum": 0, "maximum": 1 },
+    "verbosity": { "type": "number", "minimum": 0, "maximum": 1 },
+    "correction_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "humor_level": { "type": "number", "minimum": 0, "maximum": 1 },
+    "challenge_intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+    "pacing": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}
