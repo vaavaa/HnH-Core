@@ -29,6 +29,18 @@
 
 ---
 
+## Clarifications
+
+### Session 2025-02-17
+
+- Q: When the same identity_id is used again with different base_traits (or other fields), should the engine reject creation, overwrite, or treat as idempotent? → A: B — One Identity Core per identity_id; attempting to create a Core with an identity_id that already exists (regardless of other fields) MUST yield an error (already exists).
+- Q: In v0.1, is the set of behavioral dimensions fixed (exactly the seven listed) or may the implementation add more? → A: A — Fixed set of exactly seven dimensions; implementation must not add others in v0.1.
+- Q: Should the spec fix a minimal log format for replay and tests, or leave format entirely to the plan? → A: A — Spec fixes minimal contract: one record per state transition; required fields: seed, injected_time, identity_hash, active_modifiers, final_behavioral_vector; text-based, one record per line (e.g. JSON Lines). Details in plan.
+- Q: For values outside [0, 1], reject at Core creation / State input, or clamp? → A: A — Reject: values outside [0, 1] at Identity Core creation or at Dynamic State input are an error (reject); do not allow into the system.
+- Q: User scope for Relational Memory: single ID only and schema in plan, or fix minimal schema in spec? → A: B — User scope = single identifier (e.g. user_id, string); one memory per user; minimal schema fixed in spec (e.g. key-value or list of events with fields).
+
+---
+
 ## 2. User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Identity Core and Base Behavioral Vector (Priority: P1)
@@ -97,8 +109,8 @@ As a developer, I need a minimal in-memory, user-scoped Relational Memory with d
 ### Edge Cases
 
 - What happens when seed or time is missing? Engine MUST require explicit injection (no defaults that introduce non-determinism).  
-- What happens when behavioral parameters are out of range? Output MUST be normalized to 0.0–1.0; invalid inputs MUST be rejected or documented.  
-- How does the system handle duplicate identity_id? Uniqueness and idempotent creation semantics MUST be defined (e.g. same inputs → same Core).  
+- What happens when behavioral parameters are out of range? Values outside [0, 1] MUST be rejected (error) at Identity Core creation and at Dynamic State input; no clamping. Outputs inside the engine are always in 0.0–1.0.  
+- How does the system handle duplicate identity_id? At most one Identity Core per identity_id; creating a Core with an identity_id that already exists MUST fail with an error (already exists).  
 - What happens when replay is given a different seed? Replay MUST produce the output that would occur for that seed; no cross-run state leakage.
 
 ---
@@ -108,25 +120,34 @@ As a developer, I need a minimal in-memory, user-scoped Relational Memory with d
 ### Functional Requirements
 
 - **FR-001**: Identity Core MUST be immutable after creation, serializable, and hashable.  
-- **FR-002**: Identity Core MUST produce a base behavioral vector with: warmth, strictness, verbosity, correction_rate, humor_level, challenge_intensity, pacing; all normalized 0.0–1.0.  
-- **FR-003**: Identity Core MUST support required fields: identity_id, base_traits (structured numeric parameters), optional symbolic_input (e.g. natal chart metadata); symbolic inputs MUST map to measurable parameters.  
+- **FR-002**: Identity Core MUST produce a base behavioral vector with exactly the seven dimensions: warmth, strictness, verbosity, correction_rate, humor_level, challenge_intensity, pacing; all normalized 0.0–1.0. In v0.1 the set is fixed; implementation must not add other dimensions. Any input value outside [0, 1] for these dimensions MUST be rejected (error) at creation; no clamping.  
+- **FR-003**: Identity Core MUST support required fields: identity_id, base_traits (structured numeric parameters), optional symbolic_input (e.g. natal chart metadata); symbolic inputs MUST map to measurable parameters. At most one Identity Core per identity_id; creation with an existing identity_id MUST fail (already-exists error).  
 - **FR-004**: Dynamic State MUST accept injected seed and injected time.  
 - **FR-005**: Dynamic State MUST compute modifiers deterministically and MUST NOT mutate Identity Core.  
-- **FR-006**: Dynamic State MUST output: modified behavioral vector, list of active modifiers, internal state snapshot.  
+- **FR-006**: Dynamic State MUST output: modified behavioral vector, list of active modifiers, internal state snapshot. Any behavioral parameter values supplied as input to Dynamic State (e.g. from Relational Memory) that are outside [0, 1] MUST be rejected (error); no clamping.  
 - **FR-007**: Simulation MUST be reproducible when identity, seed, time input, and relational memory state are identical; identical inputs MUST produce identical outputs.  
 - **FR-008**: All randomness MUST use injected seed; no non-deterministic code in core modules.  
-- **FR-009**: Relational Memory (v0.1) MUST be in-memory, user-scoped, with deterministic update rules and MUST NOT mutate Identity Core; it MAY influence Dynamic State via defined mapping rules.  
-- **FR-010**: Engine MUST log: seed, injected time, identity hash, active modifiers, final behavioral vector; logging MUST be structured, diffable, and support replay validation.  
+- **FR-009**: Relational Memory (v0.1) MUST be in-memory, user-scoped by a single identifier (e.g. user_id, string); one memory instance per user. It MUST use a minimal schema: ordered list of events; each event MUST have at least: sequence index (or step), type, and payload (key-value or opaque data). Update rules MUST be deterministic. Relational Memory MUST NOT mutate Identity Core and MAY influence Dynamic State only via documented mapping rules.  
+- **FR-010**: Engine MUST log each state transition with a minimal contract: one record per transition; required fields: seed, injected_time, identity_hash, active_modifiers, final_behavioral_vector; format text-based, one record per line (e.g. JSON Lines). Logging MUST be diffable and support replay validation. Concrete field names and encoding are defined in the implementation plan.  
 - **FR-011**: Engine MUST support step-by-step state replay, validation of identical outputs, and a deterministic test harness; replay MUST NOT depend on system clock.  
 - **FR-012**: Engine MUST NOT depend on any LLM or external API.  
 - **FR-013**: Tests MUST verify: Identity immutability, deterministic state computation, seed reproducibility, replay correctness, parameter range 0–1, no cross-layer mutation; coverage target 90%+ for core modules.
+
+### State Transition Log (Minimal Contract)
+
+Each state transition MUST produce exactly one log record. Required fields: `seed`, `injected_time`, `identity_hash`, `active_modifiers`, `final_behavioral_vector`. Format: text-based, one record per line (e.g. JSON Lines). Concrete field names and encoding are defined in the implementation plan. Log MUST be diffable and support replay validation.
 
 ### Key Entities
 
 - **Identity Core**: Immutable entity after creation. Attributes: identity_id, base_traits (structured numeric parameters), optional symbolic_input. Produces base behavioral vector (seven dimensions, 0.0–1.0). Must be serializable and hashable.  
 - **Dynamic State**: Computed state per step. Consumes Identity Core, seed, time, optional Relational Memory. Outputs: modified behavioral vector, active modifiers, state snapshot. Must not mutate Identity Core.  
-- **Behavioral Vector**: Set of seven normalized (0.0–1.0) parameters: warmth, strictness, verbosity, correction_rate, humor_level, challenge_intensity, pacing.  
-- **Relational Memory (v0.1)**: In-memory, user-scoped structure with deterministic update rules; provides optional input to Dynamic State via defined mapping rules.
+- **Behavioral Vector**: Fixed set of exactly seven normalized (0.0–1.0) parameters in v0.1: warmth, strictness, verbosity, correction_rate, humor_level, challenge_intensity, pacing. No additional dimensions.  
+- **Relational Memory (v0.1)**: In-memory, one instance per user (user scope = single identifier, e.g. user_id). Minimal schema: ordered list of events; each event has at least sequence index (step), type, and payload (key-value or opaque). Deterministic update rules; optional input to Dynamic State via documented mapping rules; MUST NOT mutate Identity Core.
+
+### Relational Memory v0.1 (Minimal Schema)
+
+- **User scope**: Single identifier (e.g. `user_id`, string); one memory instance per user.
+- **Schema**: Ordered list of events. Each event MUST have: sequence index (step), type, payload (key-value or opaque data). Concrete field names and types are defined in the implementation plan. Updates MUST be deterministic and append-only (or otherwise defined so replay is deterministic).
 
 ---
 
