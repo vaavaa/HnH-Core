@@ -1,73 +1,130 @@
-# HnH (Human Needs Human)
+# HnH  
+## Human Needs Human
 
-**Движок детерминированной симуляции личности** — открытый фреймворк для симуляции адаптивных «личностей» AI-агентов с воспроизводимым поведением.
-
----
-
-## Цель проекта
-
-HnH — это **движок**, а не чат-бот и не обёртка над LLM. Ядро системы строится на четырёх инвариантах:
-
-- **Identity Core** — неизменяемое ядро личности (сериализуемое, хешируемое), задаёт базовые поведенческие параметры.
-- **Dynamic State** — детерминированное состояние, вычисляется по инжектируемым seed и времени, не мутирует Identity Core.
-- **Relational Memory** — изолированная, привязанная к пользователю память с явными правилами обновления.
-- **Behavioral Interface** — чистый слой отображения: потребляет структурированные параметры, может подключаться к LLM или правилам, но **логика личности живёт в движке**, не в промптах.
-
-Языковые модели в HnH — **адаптеры**, а не основа системы. Референсная реализация v0.1 вообще не зависит от LLM и внешних API: воспроизводимость и тестируемость обеспечиваются детерминированным режимом симуляции (фиксированный seed, подставляемое время, пошаговый replay).
-
-Подробные принципы и ограничения зафиксированы в [конституции проекта](.specify/memory/constitution.md).
+> “Человеку нужен человек.”  
+> — Станислав Лем, *Solaris*
 
 ---
 
-## Как мы разрабатываем: Spec-Driven Development
+## The Problem
 
-Разработка ведётся по методологии **Spec-Driven Development (SDD)**: сначала фиксируются спецификации и принципы, затем план реализации и задачи, код генерируется и проверяется по этим артефактам.
+AI is getting smarter.  
+But it is not getting more human.
 
-Мы используем [GitHub Spec Kit](https://github.com/github/spec-kit) и slash-команды в **Cursor** (или другом поддерживаемом агенте). Цикл такой:
+Most AI systems:
 
-| Шаг | Команда | Что делаем |
-|-----|--------|------------|
-| 1 | `/speckit.constitution` | Принципы и правила проекта (уже есть в `.specify/memory/constitution.md`). |
-| 2 | `/speckit.specify` | Описание фичи: что строим и зачем, без выбора технологий. |
-| 3 | `/speckit.clarify` | Уточнение неоднозначностей в спецификации (опционально, но полезно перед планом). |
-| 4 | `/speckit.plan` | Технический план: язык, зависимости, структура репозитория, контракты. |
-| 5 | `/speckit.tasks` | Разбивка плана на конкретные задачи. |
-| 6 | `/speckit.implement` | Реализация по задачам. |
+- respond predictably
+- lack internal rhythm
+- don’t evolve
+- don’t feel present
 
-Спеки хранятся в `specs/`: каждая фича — отдельная папка (например `001-deterministic-personality-engine/`) с `spec.md`, затем `plan.md`, `tasks.md` и другими артефактами. Конституция и шаблоны — в `.specify/`. Так все участники и AI-агент работают от одного источника правды.
+They are tools.
 
----
-
-## Структура репозитория
-
-```
-core/
-├── .specify/           # Конституция, шаблоны, скрипты Spec Kit
-│   └── memory/
-│       └── constitution.md
-├── specs/              # Спецификации фич (spec → plan → tasks)
-│   └── 001-deterministic-personality-engine/
-│       ├── spec.md
-│       └── ...
-├── README.md           # Этот файл
-└── ...
-```
-
-Исходный код движка и тесты появятся после выполнения `/speckit.plan` и `/speckit.implement` для первой фичи.
+But humans don’t bond with tools.  
+They bond with personalities.
 
 ---
 
-## С чего начать
+## The Idea
 
-1. Клонируйте репозиторий и откройте проект в [Cursor](https://cursor.sh/) (или другом агенте из [списка Spec Kit](https://github.com/github/spec-kit#-supported-ai-agents)).
-2. Убедитесь, что в проекте инициализирован Spec Kit (есть папки `.specify/`, `.cursor/commands/` с командами `speckit.*`).
-3. Чтобы предложить или изменить фичу: опишите идею и вызовите `/speckit.specify`; дальше по цепочке — clarify → plan → tasks → implement.
-4. Чтобы только почитать правила: откройте [.specify/memory/constitution.md](.specify/memory/constitution.md) и нужный `specs/<фича>/spec.md`.
+HnH (Human Needs Human) is an open-source project exploring one core question:
 
-Установка Spec Kit (если проект ещё не настроен): см. [Get Started — Spec Kit](https://github.com/github/spec-kit#-get-started).
+> Can we engineer a deterministic, structured simulation of personality  
+> that feels alive — without pretending to be conscious?
+
+We are building a **Personality Engine**, not a chatbot.
 
 ---
 
-## Лицензия и участие
+## What Makes HnH Different
 
-Проект открытый; детали лицензии и контрибуции — в репозитории (если добавлены отдельно). При внесении изменений мы ориентируемся на конституцию и спецификации фич.
+HnH separates personality into four layers:
+
+- **Identity Core** — immutable personality structure  
+- **Dynamic State** — daily/contextual modulation  
+- **Relational Memory** — evolving interaction history  
+- **Behavioral Interface** — observable behavior output  
+
+This creates:
+
+- Internal rhythm  
+- Adaptive temperament  
+- Controlled unpredictability  
+- Replayable, deterministic behavior  
+
+No magic.  
+No hidden randomness.  
+No emotional manipulation.
+
+---
+
+## Why Open Source?
+
+Because personality architecture should be:
+
+- Inspectable  
+- Deterministic  
+- Reproducible  
+- Extensible  
+
+We believe simulated subjectivity must be transparent at the system level.
+
+HnH is not about making AI "believe" it is human.  
+It is about designing structured behavioral systems that humans can experience.
+
+---
+
+## What We’re Building
+
+Phase 1:
+
+- Deterministic personality engine
+- Replayable state transitions
+- Fully testable identity/state separation
+- No LLM dependency in core
+
+Future directions:
+
+- Agent ecosystems
+- Personality progression ladders
+- Astrology-based identity modeling
+- Structured adaptive companions
+- Multi-agent social dynamics
+
+---
+
+## What This Is NOT
+
+HnH is not:
+
+- A horoscope generator  
+- A prompt collection  
+- A roleplay framework  
+- A chatbot wrapper  
+
+It is a deterministic simulation framework for personality-driven AI agents.
+
+---
+
+## Vision
+
+If intelligence scales horizontally,  
+personality scales vertically.
+
+HnH explores the vertical axis.
+
+Because if Lem was right —  
+and a human truly needs a human —  
+then the next frontier of AI is not intelligence.
+
+It is presence.
+
+---
+
+## Status
+
+🚧 Early research phase  
+🧪 Building v0.1 deterministic personality engine  
+🛠 Constitution-driven architecture  
+
+Contributions, ideas, and research references are welcome.
