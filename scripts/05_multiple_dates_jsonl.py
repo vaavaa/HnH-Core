@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Пример: симуляция по нескольким датам, вывод в формате JSON Lines (одна строка JSON на дату).
+Example: simulation over multiple dates, output in JSON Lines format (one JSON line per date).
 
-Удобно для экспорта в файл или конвейеров:
+Convenient for export to file or pipelines:
   python scripts/05_multiple_dates_jsonl.py 2024-01-01 2024-01-07
   python scripts/05_multiple_dates_jsonl.py 2024-01-01 2024-01-31 > january.jsonl
 """
@@ -20,8 +20,8 @@ from hnh.state.replay import run_step
 
 def main() -> None:
     if len(sys.argv) < 3:
-        print("Использование: python scripts/05_multiple_dates_jsonl.py START_DATE END_DATE", file=sys.stderr)
-        print("  Например: python scripts/05_multiple_dates_jsonl.py 2024-01-01 2024-01-07", file=sys.stderr)
+        print("Usage: python scripts/05_multiple_dates_jsonl.py START_DATE END_DATE", file=sys.stderr)
+        print("  E.g.: python scripts/05_multiple_dates_jsonl.py 2024-01-01 2024-01-07", file=sys.stderr)
         sys.exit(1)
 
     start_str, end_str = sys.argv[1], sys.argv[2]

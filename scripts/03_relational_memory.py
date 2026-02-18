@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Пример: Relational Memory — события по пользователю, модификатор из истории, шаг с учётом памяти.
+Example: Relational Memory — per-user events, modifier from history, step with memory.
 
-Создаём память пользователя, добавляем события (взаимодействия, ошибки),
-получаем поведенческий модификатор и передаём его в run_step как relational_snapshot.
+Create user memory, add events (interactions, errors),
+get behavioral modifier and pass it to run_step as relational_snapshot.
 
-Запуск из корня проекта:
+Run from project root:
   python scripts/03_relational_memory.py
 """
 
@@ -36,22 +36,22 @@ def main() -> None:
         symbolic_input=None,
     )
 
-    # Память пользователя: добавляем события
+    # User memory: add events
     memory = RelationalMemory("user-alice")
     memory.add_event(1, "interaction", {"topic": "math"})
     memory.add_event(2, "interaction", {"topic": "math"})
     memory.add_event(3, "error", {"type": "timeout"})
 
     modifier = memory.get_behavioral_modifier()
-    print("Модификатор из истории (7 размерностей):", modifier)
-    print("Производные метрики:", memory.derived_metrics())
+    print("Modifier from history (7 dimensions):", modifier)
+    print("Derived metrics:", memory.derived_metrics())
 
-    # Шаг симуляции с учётом relational snapshot
+    # Simulation step with relational snapshot
     dt = datetime(2024, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
     state = run_step(identity, dt, seed=0, relational_snapshot=modifier)
 
-    print("\nИтоговый вектор (база + транзит + relational):", state.final_behavior_vector.to_dict())
-    print("Активные модификаторы (transit_delta + relational):", state.active_modifiers.keys())
+    print("\nFinal vector (base + transit + relational):", state.final_behavior_vector.to_dict())
+    print("Active modifiers (transit_delta + relational):", state.active_modifiers.keys())
 
 
 if __name__ == "__main__":

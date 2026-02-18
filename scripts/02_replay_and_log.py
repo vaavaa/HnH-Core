@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Пример: один шаг → запись в лог (JSON Lines) → повторный прогон (replay) → проверка совпадения.
+Example: one step → write to log (JSON Lines) → replay run → check match.
 
-Показывает, как пишется структурированный лог переходов и как убедиться,
-что replay даёт тот же результат.
+Shows how to write structured transition log and how to verify
+that replay produces the same result.
 
-Запуск из корня проекта:
+Run from project root:
   python scripts/02_replay_and_log.py
   python scripts/02_replay_and_log.py --out state.log
 """
@@ -23,9 +23,9 @@ from hnh.state.replay import run_step
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Шаг симуляции + лог + replay проверка")
-    parser.add_argument("--date", default="2024-07-01", help="Дата YYYY-MM-DD")
-    parser.add_argument("--out", default="state.log", help="Файл для записи лога (JSON Lines)")
+    parser = argparse.ArgumentParser(description="Simulation step + log + replay check")
+    parser.add_argument("--date", default="2024-07-01", help="Date YYYY-MM-DD")
+    parser.add_argument("--out", default="state.log", help="Output file for log (JSON Lines)")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -43,21 +43,21 @@ def main() -> None:
         symbolic_input=None,
     )
 
-    # Первый прогон и запись в лог
+    # First run and write to log
     state1 = run_step(identity, dt, seed=args.seed)
     with open(args.out, "w", encoding="utf-8") as f:
         write_record(state1, f)
-    print(f"Записан один переход в {args.out}")
+    print(f"Written one transition to {args.out}")
 
-    # Replay: второй прогон с теми же входами
+    # Replay: second run with same inputs
     state2 = run_step(identity, dt, seed=args.seed)
     if state1.final_behavior_vector.to_dict() != state2.final_behavior_vector.to_dict():
-        print("Ошибка: replay дал другой результат.", file=sys.stderr)
+        print("Error: replay produced a different result.", file=sys.stderr)
         sys.exit(1)
-    print("Replay OK: результат совпадает с первым прогоном.")
+    print("Replay OK: result matches first run.")
 
     record = build_record(state1)
-    print("Поля записи лога:", list(record.keys()))
+    print("Log record fields:", list(record.keys()))
 
 
 if __name__ == "__main__":

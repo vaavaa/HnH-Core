@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Пример: один шаг симуляции на заданную дату.
-Аналог CLI: создаём Identity, вызываем run_step, печатаем вектор и модификаторы.
+Example: one simulation step for a given date.
+Analog of CLI: create Identity, call run_step, print vector and modifiers.
 
-Запуск из корня проекта (после pip install -e .):
+Run from project root (after pip install -e .):
   python scripts/01_basic_step.py
   python scripts/01_basic_step.py 2024-09-01
 """
@@ -40,9 +40,9 @@ def main() -> None:
     )
     state = run_step(identity, dt, seed=0)
 
-    print(f"Дата: {date_str}")
-    print("Итоговый поведенческий вектор:", state.final_behavior_vector.to_dict())
-    print("Активные модификаторы:", state.active_modifiers)
+    print(f"Date: {date_str}")
+    print("Final behavioral vector:", state.final_behavior_vector.to_dict())
+    print("Active modifiers:", state.active_modifiers)
 
 
 if __name__ == "__main__":
