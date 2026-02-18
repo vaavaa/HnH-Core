@@ -6,9 +6,9 @@ How to install the engine and use it from the command line.
 
 ## What This Is
 
-**HnH** is a deterministic personality engine: given a date and a seed, it outputs a **behavioral vector** (7 parameters in the 0–1 range) and **active modifiers**. Everything is reproducible: the same date and seed always yield the same result. The core does not use system time or unseeded randomness.
+**HnH** is a deterministic personality engine: given a date and a seed, it outputs a **behavioral vector** and **active modifiers**. On this branch (spec 002) the **hierarchical 8×4 model** is used: **32 parameters** (8 axes × 4 sub-parameters), all values in 0–1, plus per-axis aggregates (`axis_final`). Everything is reproducible: the same inputs yield the same result. The core does not use system time or unseeded randomness.
 
-The **CLI** runs a simulation for a single date and prints the result to the console or as a single JSON line.
+The **CLI** (001 mode) or scripts in **`scripts/002/`** run a simulation for a single date and print the result to the console or as a single JSON line.
 
 ---
 
@@ -50,15 +50,17 @@ The date is in **YYYY-MM-DD** format. It is treated as “injected”: the engin
 hnh --date 2024-06-15
 ```
 
-**Sample output (default mode):**
+**Sample output (CLI, 001 mode — 7 parameters):**
 
 ```
 final_behavioral_vector: {'warmth': 0.5, 'strictness': 0.4, 'verbosity': 0.6, 'correction_rate': 0.3, 'humor_level': 0.5, 'challenge_intensity': 0.4, 'pacing': 0.5}
 active_modifiers: {'transit_delta': {'warmth': 0.0, 'strictness': 0.0, ...}, ...}
 ```
 
-- **final_behavioral_vector** — the seven personality parameters for that date (all in 0.0–1.0).
-- **active_modifiers** — how the base vector was adjusted (in the demo: mainly `transit_delta`; with Relational Memory you also get `relational`).
+For **32-parameter** output (params_final, axis_final) use the scripts in `scripts/002/`.
+
+- **final_behavioral_vector** (001 mode) — seven parameters; in the 002 model the output is **params_final** (32) and **axis_final** (8), all in 0.0–1.0.
+- **active_modifiers** — how the base vector was adjusted (transit_delta, relational, etc.).
 
 ---
 
@@ -111,19 +113,24 @@ On success the same single JSON line is printed (no duplicate; it only verifies)
 
 ---
 
-## The seven parameters
+## 32 parameters (8 axes × 4) — model 002
 
-| Parameter              | Brief meaning                    |
-|------------------------|----------------------------------|
-| **warmth**             | Warmth, empathy                  |
-| **strictness**         | Strictness, demandingness        |
-| **verbosity**          | Response length                  |
-| **correction_rate**    | Frequency of explicit corrections|
-| **humor_level**        | Level of humor                   |
-| **challenge_intensity**| Intensity of challenge/difficulty|
-| **pacing**             | Pace, delivery speed             |
+On this branch the main model is **hierarchical 8×4**: 8 axes, each with 4 sub-parameters (32 total), values from **0.0** to **1.0**.
 
-Values from **0.0** to **1.0**. The current CLI uses one fixed base vector; modifiers (e.g. `transit_delta`) shift it within that range.
+| Axis | Sub-parameters |
+|------|----------------|
+| **1 — Emotional Tone** | warmth, empathy, patience, emotional_intensity |
+| **2 — Stability & Regulation** | stability, reactivity, resilience, stress_response |
+| **3 — Cognitive Style** | analytical_depth, abstraction_level, detail_orientation, big_picture_focus |
+| **4 — Structure & Discipline** | structure_preference, consistency, rule_adherence, planning_bias |
+| **5 — Communication Style** | verbosity, directness, questioning_frequency, explanation_bias |
+| **6 — Teaching Style** | correction_intensity, challenge_level, encouragement_level, pacing |
+| **7 — Power & Boundaries** | authority_presence, dominance, tolerance_for_errors, conflict_tolerance |
+| **8 — Motivation & Drive** | ambition, curiosity, initiative, persistence |
+
+Output per date: **params_final** (32 values) and **axis_final** (8 aggregates — mean of 4 sub-parameters per axis). See `scripts/002/` for demos.
+
+*(001 mode: seven parameters — warmth, strictness, verbosity, correction_rate, humor_level, challenge_intensity, pacing; used by the CLI and `scripts/01_*` … `05_*`.)*
 
 ---
 
@@ -202,30 +209,31 @@ See [scripts/002/README.md](scripts/002/README.md) and [specs/002-hierarchical-p
 
 The CLI is a thin wrapper. From Python you can:
 
-- create **Identity Core** (your own `identity_id` and base vector);
-- call **run_step(identity, injected_time, seed=..., relational_snapshot=...)** and get **DynamicState**;
-- write transition logs via **state_logger**;
+- create **Identity Core** (v0.2: 32 parameters — `hnh.identity.IdentityCore` with `base_vector`, `sensitivity_vector`);
+- call **run_step_v2(identity, config, injected_time, memory_delta=..., memory_signature=...)** and get **ReplayResult** (params_final, axis_final, replay signature);
+- write v2 logs via **state_logger_v2** (orjson);
 - use **Planetary Teacher** and **LLM adapter** (see `hnh.interface`).
 
-Minimal step example (same as inside the CLI):
+Minimal 002 step example (32 parameters):
 
 ```python
 from datetime import datetime, timezone
-from hnh.core.identity import IdentityCore
-from hnh.core.parameters import BehavioralVector
-from hnh.state.replay import run_step
+from hnh.identity import IdentityCore
+from hnh.config.replay_config import ReplayConfig
+from hnh.state.replay_v2 import run_step_v2
 
-base = BehavioralVector(
-    warmth=0.5, strictness=0.4, verbosity=0.6,
-    correction_rate=0.3, humor_level=0.5,
-    challenge_intensity=0.4, pacing=0.5,
+identity = IdentityCore(
+    identity_id="my-id",
+    base_vector=(0.5,) * 32,
+    sensitivity_vector=(0.5,) * 32,
 )
-identity = IdentityCore(identity_id="my-id", base_traits=base, symbolic_input=None)
-state = run_step(identity, datetime(2024, 6, 15, 12, 0, 0, tzinfo=timezone.utc), seed=0)
-print(state.final_behavior_vector.to_dict())
+config = ReplayConfig(global_max_delta=0.15, shock_threshold=0.8, shock_multiplier=1.5)
+result = run_step_v2(identity, config, datetime(2025, 2, 18, 12, 0, 0, tzinfo=timezone.utc))
+print("params_final (32):", result.params_final[:8], "...")
+print("axis_final (8):", result.axis_final)
 ```
 
-More details in the code and in `specs/001-deterministic-personality-engine/`.
+More in `scripts/002/` and `specs/002-hierarchical-personality-model/`. For 001 (7 parameters): `hnh.core.identity`, `hnh.state.replay.run_step`.
 
 ---
 

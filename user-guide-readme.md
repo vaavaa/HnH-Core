@@ -6,9 +6,9 @@
 
 ## Что это такое
 
-**HnH** — детерминированный движок «личности»: по заданной дате и сиду он выдаёт **поведенческий вектор** (7 параметров от 0 до 1) и **активные модификаторы**. Всё воспроизводимо: одни и те же дата и seed дают один и тот же результат. В ядре нет обращения к системному времени и случайности без явного seed.
+**HnH** — детерминированный движок «личности»: по заданной дате и сиду он выдаёт **поведенческий вектор** и **активные модификаторы**. В этой ветке (спека 002) используется **иерархическая модель 8×4**: **32 параметра** (8 осей по 4 подпараметра), все значения от 0 до 1, плюс агрегаты по осям (`axis_final`). Всё воспроизводимо: одни и те же входы дают один и тот же результат. В ядре нет обращения к системному времени и случайности без явного seed.
 
-Через **CLI** вы запускаете симуляцию на одну дату и смотрите результат в консоли или в виде одной строки JSON.
+Через **CLI** (режим 001) или скрипты в **`scripts/002/`** вы запускаете симуляцию на одну дату и смотрите результат в консоли или в виде одной строки JSON.
 
 ---
 
@@ -50,15 +50,17 @@ pip install -e ".[astrology]"
 hnh --date 2024-06-15
 ```
 
-**Пример вывода (обычный режим):**
+**Пример вывода (CLI, режим 001 — 7 параметров):**
 
 ```
 final_behavioral_vector: {'warmth': 0.5, 'strictness': 0.4, 'verbosity': 0.6, 'correction_rate': 0.3, 'humor_level': 0.5, 'challenge_intensity': 0.4, 'pacing': 0.5}
 active_modifiers: {'transit_delta': {'warmth': 0.0, 'strictness': 0.0, ...}, ...}
 ```
 
-- **final_behavioral_vector** — итоговые семь параметров личности на эту дату (все в диапазоне 0.0–1.0).
-- **active_modifiers** — чем «подправлен» базовый вектор (сейчас в демо: в основном `transit_delta`; при использовании Relational Memory появится и `relational`).
+Для вывода **32 параметров** (params_final, axis_final) используйте скрипты в `scripts/002/`.
+
+- **final_behavioral_vector** (режим 001) — семь параметров; в модели 002 вывод — **params_final** (32) и **axis_final** (8), все в диапазоне 0.0–1.0.
+- **active_modifiers** — чем «подправлен» базовый вектор (transit_delta, relational и т.д.).
 
 ---
 
@@ -111,19 +113,24 @@ hnh --date 2024-05-01 --replay --json
 
 ---
 
-## Что означают семь параметров
+## 32 параметра (8 осей × 4) — модель 002
 
-| Параметр               | Кратко                          |
-|------------------------|----------------------------------|
-| **warmth**             | Теплота, эмпатия                |
-| **strictness**         | Строгость, требовательность     |
-| **verbosity**          | Развёрнутость ответов           |
-| **correction_rate**    | Частота явных исправлений       |
-| **humor_level**        | Уровень юмора                   |
-| **challenge_intensity**| Интенсивность вызова/сложности   |
-| **pacing**             | Темп, скорость подачи          |
+В этой ветке основная модель — **иерархическая 8×4**: 8 осей, у каждой по 4 подпараметра (всего 32), значения от **0.0** до **1.0**.
 
-Значения от **0.0** до **1.0**. В текущем CLI используется один фиксированный базовый вектор; модификаторы (например, `transit_delta`) его слегка сдвигают в рамках этого диапазона.
+| Ось | Подпараметры |
+|-----|----------------|
+| **1 — Emotional Tone** | warmth, empathy, patience, emotional_intensity |
+| **2 — Stability & Regulation** | stability, reactivity, resilience, stress_response |
+| **3 — Cognitive Style** | analytical_depth, abstraction_level, detail_orientation, big_picture_focus |
+| **4 — Structure & Discipline** | structure_preference, consistency, rule_adherence, planning_bias |
+| **5 — Communication Style** | verbosity, directness, questioning_frequency, explanation_bias |
+| **6 — Teaching Style** | correction_intensity, challenge_level, encouragement_level, pacing |
+| **7 — Power & Boundaries** | authority_presence, dominance, tolerance_for_errors, conflict_tolerance |
+| **8 — Motivation & Drive** | ambition, curiosity, initiative, persistence |
+
+Итог по дате: **params_final** (32 числа) и **axis_final** (8 агрегатов — среднее по 4 подпараметрам оси). Демо — в `scripts/002/`, см. раздел ниже.
+
+*(Режим 001: семь параметров — warmth, strictness, verbosity, correction_rate, humor_level, challenge_intensity, pacing; используется в CLI и в `scripts/01_*` … `05_*`.)*
 
 ---
 
@@ -202,30 +209,31 @@ python scripts/002/08_full_step_v2.py --date 2025-03-01 --log
 
 CLI — обёртка над движком. Из Python можно:
 
-- создавать **Identity Core** (свой `identity_id` и базовый вектор);
-- вызывать **run_step(identity, injected_time, seed=..., relational_snapshot=...)** и получать **DynamicState**;
-- писать логи переходов через **state_logger**;
+- создавать **Identity Core** (v0.2: 32 параметра — `hnh.identity.IdentityCore` с `base_vector`, `sensitivity_vector`);
+- вызывать **run_step_v2(identity, config, injected_time, memory_delta=..., memory_signature=...)** и получать **ReplayResult** (params_final, axis_final и подпись replay);
+- писать логи v2 через **state_logger_v2** (orjson);
 - использовать **Planetary Teacher** и **LLM-адаптер** (см. `hnh.interface`).
 
-Пример минимального шага (как внутри CLI):
+Пример минимального шага по модели 002 (32 параметра):
 
 ```python
 from datetime import datetime, timezone
-from hnh.core.identity import IdentityCore
-from hnh.core.parameters import BehavioralVector
-from hnh.state.replay import run_step
+from hnh.identity import IdentityCore
+from hnh.config.replay_config import ReplayConfig
+from hnh.state.replay_v2 import run_step_v2
 
-base = BehavioralVector(
-    warmth=0.5, strictness=0.4, verbosity=0.6,
-    correction_rate=0.3, humor_level=0.5,
-    challenge_intensity=0.4, pacing=0.5,
+identity = IdentityCore(
+    identity_id="my-id",
+    base_vector=(0.5,) * 32,
+    sensitivity_vector=(0.5,) * 32,
 )
-identity = IdentityCore(identity_id="my-id", base_traits=base, symbolic_input=None)
-state = run_step(identity, datetime(2024, 6, 15, 12, 0, 0, tzinfo=timezone.utc), seed=0)
-print(state.final_behavior_vector.to_dict())
+config = ReplayConfig(global_max_delta=0.15, shock_threshold=0.8, shock_multiplier=1.5)
+result = run_step_v2(identity, config, datetime(2025, 2, 18, 12, 0, 0, tzinfo=timezone.utc))
+print("params_final (32):", result.params_final[:8], "...")
+print("axis_final (8):", result.axis_final)
 ```
 
-Подробнее — в коде и в спецификациях в `specs/001-deterministic-personality-engine/`.
+Подробнее — в `scripts/002/` и в `specs/002-hierarchical-personality-model/`. Режим 001 (7 параметров): `hnh.core.identity`, `hnh.state.replay.run_step`.
 
 ---
 
