@@ -1,6 +1,7 @@
 """
 State assembly for 32-parameter model (Spec 002).
-final[p] = clamp01(base[p] + (bounded_delta[p] × sensitivity[p]) + memory_delta[p]).
+final[p] = clamp01(base[p] + transit_effect[p] + memory_delta[p]).
+Default transit_effect = bounded_delta[p] × sensitivity[p]; optional precomputed (e.g. 0.7*daily + 0.3*phase).
 Axis aggregation: axis_final = mean(final sub-parameters). Deterministic.
 """
 
@@ -18,10 +19,13 @@ def assemble_state(
     sensitivity_vector: tuple[float, ...],
     bounded_delta: tuple[float, ...],
     memory_delta: tuple[float, ...] | None = None,
+    *,
+    precomputed_transit_effect: tuple[float, ...] | None = None,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
     Compute params_final (32) and axis_final (8).
-    Formula: final[p] = clamp01(base[p] + bounded_delta[p]*sensitivity[p] + memory_delta[p]).
+    Formula: final[p] = clamp01(base[p] + transit_effect[p] + memory_delta[p]).
+    transit_effect = precomputed_transit_effect if provided, else bounded_delta[p]*sensitivity_vector[p].
     memory_delta default: zeros.
     """
     if len(base_vector) != NUM_PARAMETERS or len(sensitivity_vector) != NUM_PARAMETERS or len(bounded_delta) != NUM_PARAMETERS:
@@ -29,9 +33,15 @@ def assemble_state(
     mem = memory_delta if memory_delta is not None else (0.0,) * NUM_PARAMETERS
     if len(mem) != NUM_PARAMETERS:
         raise ValueError(f"memory_delta length must be {NUM_PARAMETERS}")
+    if precomputed_transit_effect is not None and len(precomputed_transit_effect) != NUM_PARAMETERS:
+        raise ValueError(f"precomputed_transit_effect length must be {NUM_PARAMETERS}")
     params_final: list[float] = []
     for p in range(NUM_PARAMETERS):
-        val = base_vector[p] + bounded_delta[p] * sensitivity_vector[p] + mem[p]
+        if precomputed_transit_effect is not None:
+            transit = precomputed_transit_effect[p]
+        else:
+            transit = bounded_delta[p] * sensitivity_vector[p]
+        val = base_vector[p] + transit + mem[p]
         params_final.append(clamp01(val))
     # Axis aggregation: mean of 4 sub-params per axis
     axis_final: list[float] = [0.0] * NUM_AXES

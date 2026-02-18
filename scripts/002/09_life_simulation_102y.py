@@ -22,6 +22,7 @@ from datetime import date, datetime, timedelta, timezone
 from hnh.config.replay_config import ReplayConfig
 from hnh.identity import IdentityCore
 from hnh.identity.schema import AXES, NUM_PARAMETERS, _registry
+from hnh.modulation.delta import PHASE_WINDOW_DAYS_BY_CATEGORY
 from hnh.state.replay_v2 import run_step_v2
 
 # Лондон: широта, долгота (все родились в Лондоне)
@@ -96,8 +97,15 @@ def _run_one_life(
     end_params: tuple[float, ...] | None = None
     end_axis: tuple[float, ...] | None = None
 
+    # Dynamic window by category: personal 7d (погода), social 30d (сезон), outer 365d (эпоха)
+    history_by_cat: dict[str, list[tuple[float, ...]]] = {
+        "personal": [],
+        "social": [],
+        "outer": [],
+    }
     current = birth_date
     while current <= end_date:
+        day_by_cat: dict[str, list[tuple[float, ...]]] = {"personal": [], "social": [], "outer": []}
         for hour, minute in TIME_SLOTS:
             dt_utc = datetime(
                 current.year, current.month, current.day,
@@ -110,12 +118,26 @@ def _run_one_life(
                 memory_delta=memory_delta,
                 memory_signature=memory_signature,
                 natal_positions=natal,
+                transit_effect_history_by_category=history_by_cat,
             )
+            if result.daily_transit_effect_by_category:
+                for cat in ("personal", "social", "outer"):
+                    day_by_cat[cat].append(result.daily_transit_effect_by_category[cat])
             if start_params is None:
                 start_params = result.params_final
                 start_axis = result.axis_final
             end_params = result.params_final
             end_axis = result.axis_final
+        for cat in ("personal", "social", "outer"):
+            if day_by_cat[cat]:
+                day_avg = tuple(
+                    sum(d[i] for d in day_by_cat[cat]) / len(day_by_cat[cat])
+                    for i in range(NUM_PARAMETERS)
+                )
+                history_by_cat[cat].append(day_avg)
+                max_len = PHASE_WINDOW_DAYS_BY_CATEGORY[cat]
+                if len(history_by_cat[cat]) > max_len:
+                    history_by_cat[cat].pop(0)
         current += timedelta(days=1)
 
     if start_axis is None or end_axis is None or start_params is None or end_params is None:

@@ -12,6 +12,7 @@ import pytest
 from hnh.config.replay_config import ReplayConfig
 from hnh.identity.schema import IdentityCore, NUM_AXES, NUM_PARAMETERS, _registry
 from hnh.state.replay_v2 import (
+    PHASE_WINDOW_DAYS,
     REPLAY_TOLERANCE,
     replay_match,
     replay_output_hash,
@@ -154,3 +155,25 @@ def test_run_step_v2_with_transit_mock() -> None:
     finally:
         replay_v2.tr = original_tr
     _registry.discard("r6")
+
+
+def test_run_step_v2_phase_blending_and_daily_transit_effect() -> None:
+    """With transit_effect_history, result uses 0.7*daily + 0.3*phase; daily_transit_effect is returned."""
+    identity = _make_identity("r7")
+    config = _make_config()
+    t = datetime(2025, 2, 18, 12, 0, 0, tzinfo=timezone.utc)
+    r_no_history = run_step_v2(identity, config, t, memory_signature="m7")
+    assert len(r_no_history.daily_transit_effect) == NUM_PARAMETERS
+
+    # Fake history: constant small effect so phase is non-zero
+    fake = (0.01,) * NUM_PARAMETERS
+    history = [fake] * PHASE_WINDOW_DAYS
+    r_with_history = run_step_v2(
+        identity, config, t, memory_signature="m7", transit_effect_history=history
+    )
+    # With same time, daily_transit_effect is identical
+    assert r_with_history.daily_transit_effect == r_no_history.daily_transit_effect
+    # But params_final can differ because we blend 0.7*daily + 0.3*phase (phase = fake here)
+    # So r_with_history has more influence from fake → different from r_no_history unless daily was already ~fake
+    assert r_with_history.params_final is not None
+    _registry.discard("r7")

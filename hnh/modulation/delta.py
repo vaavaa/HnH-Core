@@ -30,6 +30,34 @@ PLANET_AXIS_MAP: dict[str, str | tuple[str, ...]] = {
     "Pluto": "power_boundaries",
 }
 
+# Planet categories for dynamic phase window: погода / сезон / эпоха
+PLANET_CATEGORY: dict[str, str] = {
+    "Sun": "personal",
+    "Moon": "personal",
+    "Mercury": "personal",
+    "Venus": "personal",
+    "Mars": "personal",
+    "Jupiter": "social",
+    "Saturn": "social",
+    "Uranus": "outer",
+    "Neptune": "outer",
+    "Pluto": "outer",
+}
+# Rolling window (days) per category
+PHASE_WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
+    "personal": 7,   # погода
+    "social": 30,    # сезон
+    "outer": 365,    # эпоха
+}
+
+# Outer planets get higher weight than inner (Mars/Jupiter same as inner).
+OUTER_PLANET_MULTIPLIER: dict[str, float] = {
+    "Saturn": 1.2,
+    "Uranus": 1.4,
+    "Neptune": 1.3,
+    "Pluto": 1.5,
+}
+
 # Default aspect → parameter weights (sparse). Same aspect can affect multiple params.
 # Keys: aspect name; value: dict param_name -> weight (float).
 # Weights for cognitive_style, structure_discipline, stability_regulation, power_boundaries
@@ -146,6 +174,10 @@ def compute_raw_delta_32(
             # Planet fields exist but none are mapped → don't affect any axis
             continue
         intensity = _intensity_factor(asp, orb_scale)
+        outer_mul = max(
+            OUTER_PLANET_MULTIPLIER.get(planet1, 1.0),
+            OUTER_PLANET_MULTIPLIER.get(planet2, 1.0),
+        )
         for param_name, w in weights[aspect_name].items():
             if param_name not in param_list:
                 continue
@@ -153,5 +185,37 @@ def compute_raw_delta_32(
             if affected_axes and _axis_of_param(param_name) not in affected_axes:
                 continue
             idx = param_list.index(param_name)
-            raw[idx] += w * intensity
+            raw[idx] += w * intensity * outer_mul
     return tuple(raw)
+
+
+def _aspect_category(asp: dict[str, Any]) -> str:
+    """Assign aspect to one category: outer > social > personal (slowest planet wins)."""
+    p1 = asp.get("planet1")
+    p2 = asp.get("planet2")
+    c1 = PLANET_CATEGORY.get(p1, "personal")
+    c2 = PLANET_CATEGORY.get(p2, "personal")
+    if c1 == "outer" or c2 == "outer":
+        return "outer"
+    if c1 == "social" or c2 == "social":
+        return "social"
+    return "personal"
+
+
+def compute_raw_delta_32_by_category(
+    aspects_to_natal: list[dict[str, Any]],
+    aspect_weights: dict[str, dict[str, float]] | None = None,
+    orb_scale: float = 1.0,
+) -> dict[str, tuple[float, ...]]:
+    """
+    Split aspects by planet category (personal/social/outer); return raw_delta per category.
+    Each aspect counted in exactly one category. Sum of the three = compute_raw_delta_32(all).
+    """
+    by_cat: dict[str, list[dict[str, Any]]] = {"personal": [], "social": [], "outer": []}
+    for asp in aspects_to_natal:
+        cat = _aspect_category(asp)
+        by_cat[cat].append(asp)
+    return {
+        cat: compute_raw_delta_32(by_cat[cat], aspect_weights=aspect_weights, orb_scale=orb_scale)
+        for cat in ("personal", "social", "outer")
+    }

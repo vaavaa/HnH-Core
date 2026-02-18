@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from hnh.identity.schema import AXES, NUM_PARAMETERS, PARAMETERS, get_parameter_axis_index
-from hnh.modulation.delta import compute_raw_delta_32
+from hnh.modulation.delta import (
+    PHASE_WINDOW_DAYS_BY_CATEGORY,
+    compute_raw_delta_32,
+    compute_raw_delta_32_by_category,
+)
 
 
 def _axis_indices(axis_name: str) -> set[int]:
@@ -125,6 +129,26 @@ def test_sun_aspect_produces_nonzero_power_delta() -> None:
     vec = compute_raw_delta_32(aspects)
     power_ix = _axis_indices("power_boundaries")
     assert any(vec[i] != 0.0 for i in power_ix)
+
+
+def test_raw_delta_32_by_category_sum_equals_full() -> None:
+    """Sum of personal+social+outer raw_delta equals compute_raw_delta_32(all aspects)."""
+    aspects = [
+        {"planet1": "Mercury", "planet2": "Sun", "aspect": "Square", "angle": 90.0, "separation": 90.0},
+        {"planet1": "Saturn", "planet2": "Moon", "aspect": "Trine", "angle": 120.0, "separation": 120.0},
+    ]
+    full = compute_raw_delta_32(aspects)
+    by_cat = compute_raw_delta_32_by_category(aspects)
+    summed = tuple(
+        by_cat["personal"][i] + by_cat["social"][i] + by_cat["outer"][i]
+        for i in range(NUM_PARAMETERS)
+    )
+    assert len(by_cat) == 3
+    assert by_cat["personal"].__class__ == tuple
+    assert PHASE_WINDOW_DAYS_BY_CATEGORY["personal"] == 7
+    assert PHASE_WINDOW_DAYS_BY_CATEGORY["outer"] == 365
+    for i in range(NUM_PARAMETERS):
+        assert abs(full[i] - summed[i]) < 1e-9
 
 
 def test_planet_does_not_move_unrelated_axes_unless_mapped() -> None:
