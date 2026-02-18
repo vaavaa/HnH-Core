@@ -10,6 +10,10 @@
 
 ## Clarifications
 
+### Session 2025-02-18
+
+- Phase accumulation: зафиксирована формула `phase[t] = clamp(phase[t-1]*decay + daily[t]*phase_gain, -phase_limit, +phase_limit)`, phase_limit = 0.5×global_max_delta, decay = 0.98, phase_gain = 0.3; см. §10 Phase accumulation.
+
 ### Session 2025-02-17
 
 - Q: При отсутствии натальной карты откуда берутся base[32] и sensitivity[32]? → A: Только явный ввод: при отсутствии натала вызывающий код обязан передать base[32] и sensitivity[32]; в спеке не определяем дефолтные значения.
@@ -225,6 +229,15 @@ Sensitivity MUST: be normalized to [0,1]; be stored in Identity Core; be immutab
 - Raw: `raw_delta[p] = Σ(aspect_weight × mapping_weight × intensity_factor)`
 - Bounded: `bounded_delta[p] = clamp(raw_delta[p], -max_delta[p], +max_delta[p])`
 - Transit effect: `transit_effect[p] = bounded_delta[p] × sensitivity[p]`
+
+**Phase accumulation (optional, when category-wise replay is used)**  
+When the caller provides previous phase state per category (personal / social / outer), the engine applies exponential accumulation and clamp so that medium-term “phase” stays bounded and stable:
+
+- Formula: `phase[t] = clamp(phase[t-1] × decay + daily[t] × phase_gain, -phase_limit, +phase_limit)` (per parameter, per category).
+- Constants (versioned in implementation): `decay` (e.g. 0.98, half-life ~34 days), `phase_gain` in 0.2–0.4 (e.g. 0.3), not 1.0.
+- Limit: `phase_limit = 0.5 × global_max_delta` (e.g. 0.075 when global_max_delta = 0.15), so that max_abs_params remains &lt; 0.1.
+- Blending: effective transit for assembly = `0.7 × daily_transit_effect + 0.3 × (phase_personal + phase_social + phase_outer)`; daily part is not reduced.
+- Purpose: “restrained but alive” dynamics; target mean_abs_axis 0.004–0.010, max_abs_params &lt; 0.08.
 
 ---
 
