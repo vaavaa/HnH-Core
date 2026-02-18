@@ -72,6 +72,16 @@ def _cmd_run(args: argparse.Namespace) -> None:
         print("active_modifiers:", state.active_modifiers)
 
 
+def _default_natal_positions_for_transits() -> dict | None:
+    """Default natal chart for CLI run-v2 so transits vary by --date. None if astrology unavailable."""
+    try:
+        from hnh.core.natal import build_natal_positions
+        birth = datetime(2000, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        return build_natal_positions(birth, 0.0, 0.0)
+    except Exception:
+        return None
+
+
 def _cmd_run_v2(args: argparse.Namespace) -> None:
     """Execute run-v2: one step 002 (32 parameters, 8 axes)."""
     try:
@@ -86,6 +96,8 @@ def _cmd_run_v2(args: argparse.Namespace) -> None:
     from hnh.identity.schema import NUM_PARAMETERS, _registry
     from hnh.state.replay_v2 import run_step_v2
 
+    natal_positions = _default_natal_positions_for_transits()
+
     _registry.discard("cli-default-v2")
     identity = IdentityCore(
         identity_id="cli-default-v2",
@@ -93,7 +105,7 @@ def _cmd_run_v2(args: argparse.Namespace) -> None:
         sensitivity_vector=(0.5,) * NUM_PARAMETERS,
     )
     config = ReplayConfig(global_max_delta=0.15, shock_threshold=0.8, shock_multiplier=1.5)
-    result = run_step_v2(identity, config, injected)
+    result = run_step_v2(identity, config, injected, natal_positions=natal_positions)
 
     if args.replay:
         _registry.discard("cli-default-v2-replay")
@@ -102,7 +114,7 @@ def _cmd_run_v2(args: argparse.Namespace) -> None:
             base_vector=(0.5,) * NUM_PARAMETERS,
             sensitivity_vector=(0.5,) * NUM_PARAMETERS,
         )
-        result2 = run_step_v2(identity2, config, injected)
+        result2 = run_step_v2(identity2, config, injected, natal_positions=natal_positions)
         if result.params_final != result2.params_final or result.axis_final != result2.axis_final:
             print("Replay mismatch: outputs differ.", file=sys.stderr)
             sys.exit(1)
