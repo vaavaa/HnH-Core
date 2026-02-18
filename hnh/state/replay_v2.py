@@ -26,10 +26,14 @@ from hnh.state.assembler import assemble_state
 REPLAY_TOLERANCE: float = 1e-9
 
 # Phase smoothing: final = base + (PHASE_DAILY_WEIGHT * daily + PHASE_SMOOTH_WEIGHT * phase) + memory
-# Dynamic window by planet category: personal 7d (погода), social 30d (сезон), outer 365d (эпоха).
+# Exponential accumulation: phase[t] = clamp(phase[t-1]*decay + daily[t]*phase_gain, -phase_limit, +phase_limit)
+# phase_limit = 0.5 * global_max_delta → удерживает max_abs_params < 0.1
 PHASE_DAILY_WEIGHT: float = 0.7
 PHASE_SMOOTH_WEIGHT: float = 0.3
-# Backward compat: single-window default (e.g. for tests)
+PHASE_DECAY: float = 0.98  # half-life ~34 days; 0.97→23d, 0.995→138d
+PHASE_GAIN: float = 0.3   # 0.2–0.4, не 1.0
+# phase_limit = 0.5 * config.global_max_delta (computed per step)
+# Backward compat: single-window mean (for transit_effect_history path)
 PHASE_WINDOW_DAYS: int = PHASE_WINDOW_DAYS_BY_CATEGORY["social"]
 
 try:
@@ -54,7 +58,8 @@ class ReplayResult:
     effective_max_delta: tuple[float, ...]
     memory_signature: str
     daily_transit_effect: tuple[float, ...]  # bounded_delta × sensitivity; for caller's rolling buffer
-    daily_transit_effect_by_category: dict[str, tuple[float, ...]] | None = None  # personal/social/outer when using dynamic window
+    daily_transit_effect_by_category: dict[str, tuple[float, ...]] | None = None  # personal/social/outer
+    phase_by_category_after: dict[str, tuple[float, ...]] | None = None  # after exponential accumulation, for next step
 
 
 def _transit_signature_hash(transit_data: dict[str, Any] | None) -> str:
@@ -73,14 +78,14 @@ def run_step_v2(
     memory_signature: str = "",
     natal_positions: dict[str, Any] | None = None,
     transit_effect_history: list[tuple[float, ...]] | None = None,
-    transit_effect_history_by_category: dict[str, list[tuple[float, ...]]] | None = None,
+    transit_effect_phase_prev_by_category: dict[str, tuple[float, ...]] | None = None,
 ) -> ReplayResult:
     """
     Run one deterministic state step (v0.2 pipeline).
-    Optional transit_effect_history: single buffer, window PHASE_WINDOW_DAYS (backward compat).
-    Optional transit_effect_history_by_category: {"personal": [...], "social": [...], "outer": [...]}
-    with dynamic windows 7 / 30 / 365 days (погода / сезон / эпоха). Blended as
-    final = base + (0.7*daily + 0.3*(phase_personal + phase_social + phase_outer)) + memory.
+    Optional transit_effect_history: single buffer, window PHASE_WINDOW_DAYS (backward compat, mean).
+    Optional transit_effect_phase_prev_by_category: previous phase state per category for exponential
+    accumulation: phase[t] = clamp(phase[t-1]*decay + daily[t]*phase_gain, -phase_limit, +phase_limit),
+    phase_limit = 0.5*global_max_delta. Blended as final = base + (0.7*daily + 0.3*(phase_p+phase_s+phase_o)) + memory.
     """
     if injected_time_utc.tzinfo is None:
         injected_time_utc = injected_time_utc.replace(tzinfo=timezone.utc)
@@ -100,7 +105,7 @@ def run_step_v2(
     if tr is not None and natal_positions is not None:
         transit_data = tr.compute_transit_signature(injected_time_utc, natal_positions)
         aspects = transit_data.get("aspects_to_natal", [])
-        if transit_effect_history_by_category is not None:
+        if transit_effect_phase_prev_by_category is not None:
             raw_by_cat = compute_raw_delta_32_by_category(aspects)
             raw_delta_list = [
                 raw_by_cat["personal"][i] + raw_by_cat["social"][i] + raw_by_cat["outer"][i]
@@ -113,7 +118,7 @@ def run_step_v2(
     max_raw = max(abs(r) for r in raw_delta)
     shock_active = max_raw > config.shock_threshold
 
-    if raw_by_cat is not None and transit_effect_history_by_category is not None:
+    if raw_by_cat is not None and transit_effect_phase_prev_by_category is not None:
         bounded_p, _ = apply_bounds(raw_by_cat["personal"], config, shock_active)
         bounded_s, _ = apply_bounds(raw_by_cat["social"], config, shock_active)
         bounded_o, effective_max_delta = apply_bounds(raw_by_cat["outer"], config, shock_active)
@@ -123,16 +128,21 @@ def run_step_v2(
         daily_transit_effect = tuple(daily_p[i] + daily_s[i] + daily_o[i] for i in range(NUM_PARAMETERS))
         daily_by_cat = {"personal": daily_p, "social": daily_s, "outer": daily_o}
 
-        phase_parts: list[tuple[float, ...]] = []
+        # phase[t] = clamp(phase[t-1]*decay + daily[t]*phase_gain, -phase_limit, +phase_limit)
+        phase_limit = 0.5 * config.global_max_delta
+        phase_after = {}
+        phase_parts = []
         for cat in ("personal", "social", "outer"):
-            hist = transit_effect_history_by_category.get(cat) or []
-            wdays = PHASE_WINDOW_DAYS_BY_CATEGORY[cat]
-            window = hist[-wdays:] if len(hist) > wdays else hist
-            if not window:
-                phase_parts.append((0.0,) * NUM_PARAMETERS)
-            else:
-                n = len(window)
-                phase_parts.append(tuple(sum(v[i] for v in window) / n for i in range(NUM_PARAMETERS)))
+            prev = transit_effect_phase_prev_by_category.get(cat)
+            if prev is None or len(prev) != NUM_PARAMETERS:
+                prev = (0.0,) * NUM_PARAMETERS
+            daily_cat = daily_by_cat[cat]
+            new_phase = tuple(
+                max(-phase_limit, min(phase_limit, prev[p] * PHASE_DECAY + daily_cat[p] * PHASE_GAIN))
+                for p in range(NUM_PARAMETERS)
+            )
+            phase_after[cat] = new_phase
+            phase_parts.append(new_phase)
         phase_combined = tuple(
             phase_parts[0][i] + phase_parts[1][i] + phase_parts[2][i] for i in range(NUM_PARAMETERS)
         )
@@ -159,6 +169,7 @@ def run_step_v2(
             memory_signature=memory_signature,
             daily_transit_effect=daily_transit_effect,
             daily_transit_effect_by_category=daily_by_cat,
+            phase_by_category_after=phase_after,
         )
 
     bounded_delta, effective_max_delta = apply_bounds(raw_delta, config, shock_active)
@@ -201,6 +212,7 @@ def run_step_v2(
         memory_signature=memory_signature,
         daily_transit_effect=daily_transit_effect,
         daily_transit_effect_by_category=None,
+        phase_by_category_after=None,
     )
 
 
