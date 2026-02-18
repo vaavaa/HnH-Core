@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
-from hnh.identity.schema import NUM_PARAMETERS
+from hnh.identity.schema import AXES, NUM_PARAMETERS, PARAMETERS, get_parameter_axis_index
 from hnh.modulation.delta import compute_raw_delta_32
+
+
+def _axis_indices(axis_name: str) -> set[int]:
+    axis_ix = AXES.index(axis_name)
+    return {i for i in range(NUM_PARAMETERS) if get_parameter_axis_index(i) == axis_ix}
 
 
 def test_raw_delta_32_length() -> None:
@@ -72,3 +77,69 @@ def test_raw_delta_orb_scale_zero_intensity_one() -> None:
     vec = compute_raw_delta_32(aspects, orb_scale=0.0)
     assert len(vec) == NUM_PARAMETERS
     assert any(v != 0.0 for v in vec)
+
+
+def test_mercury_aspect_produces_nonzero_cognitive_delta() -> None:
+    """Mercury aspect must move cognitive_style (non-zero)."""
+    aspects = [
+        {
+            "planet1": "Mercury",
+            "planet2": "Sun",
+            "aspect": "Conjunction",
+            "angle": 0.0,
+            "separation": 0.0,
+        }
+    ]
+    vec = compute_raw_delta_32(aspects)
+    cog_ix = _axis_indices("cognitive_style")
+    assert any(vec[i] != 0.0 for i in cog_ix)
+
+
+def test_saturn_aspect_produces_nonzero_structure_delta() -> None:
+    """Saturn aspect must move structure_discipline (non-zero)."""
+    aspects = [
+        {
+            "planet1": "Saturn",
+            "planet2": "Moon",
+            "aspect": "Trine",
+            "angle": 120.0,
+            "separation": 120.0,
+        }
+    ]
+    vec = compute_raw_delta_32(aspects)
+    struct_ix = _axis_indices("structure_discipline")
+    assert any(vec[i] != 0.0 for i in struct_ix)
+
+
+def test_sun_aspect_produces_nonzero_power_delta() -> None:
+    """Sun aspect must move power_boundaries (non-zero)."""
+    aspects = [
+        {
+            "planet1": "Sun",
+            "planet2": "Venus",
+            "aspect": "Sextile",
+            "angle": 60.0,
+            "separation": 60.0,
+        }
+    ]
+    vec = compute_raw_delta_32(aspects)
+    power_ix = _axis_indices("power_boundaries")
+    assert any(vec[i] != 0.0 for i in power_ix)
+
+
+def test_planet_does_not_move_unrelated_axes_unless_mapped() -> None:
+    """With planet1/planet2 present, only affected axes may receive deltas."""
+    aspects = [
+        {
+            "planet1": "Mercury",
+            "planet2": "Sun",
+            "aspect": "Square",
+            "angle": 90.0,
+            "separation": 90.0,
+        }
+    ]
+    vec = compute_raw_delta_32(aspects)
+    allowed = _axis_indices("cognitive_style") | _axis_indices("power_boundaries")
+    for i, v in enumerate(vec):
+        if i not in allowed:
+            assert v == 0.0

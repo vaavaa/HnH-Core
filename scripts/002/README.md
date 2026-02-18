@@ -22,5 +22,6 @@ python scripts/002/01_schema_and_identity.py
 | [06_logging_v2.py](06_logging_v2.py) | Лог v2 (orjson): build_record_v2, write_record_v2. Опции: `--out 002_demo.log`, `--date 2025-02-18` |
 | [07_replay_v2.py](07_replay_v2.py) | Replay v2: N прогонов с одинаковыми входами, replay_match (1e-9), replay_output_hash |
 | [08_full_step_v2.py](08_full_step_v2.py) | Полный шаг: identity + config + время + память → ReplayResult. Опции: `--date`, `--log` |
+| [09_life_simulation_102y.py](09_life_simulation_102y.py) | Симуляция жизни 102 года (1783-12-12, Лондон): по дням, 2 расчёта/день, динамическая диаграмма в CLI, саммари дельт начало/конец. Опции: `--delay`, `--fast`, `--days N`, `--no-utf8` |
 
 Спека: [specs/002-hierarchical-personality-model/](../specs/002-hierarchical-personality-model/).
