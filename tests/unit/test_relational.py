@@ -69,3 +69,51 @@ def test_snapshot_serializable():
     # Serializable = can round-trip via dict (e.g. JSON)
     import json
     json.dumps(snap)
+
+
+# --- Spec 002 Phase 6: memory_delta_32, memory_signature -----------------------
+
+
+def test_memory_delta_32_length_and_bounds():
+    """T6.1/T6.2: memory_delta_32 has 32 elements, |delta[p]| ≤ 0.5 * global_max_delta."""
+    from hnh.identity.schema import NUM_PARAMETERS
+
+    mem = RelationalMemory("user-32")
+    mem.add_event(1, "interaction")
+    mem.add_event(2, "error")
+    global_max = 0.2
+    cap = 0.5 * global_max  # 0.1
+    delta = mem.get_memory_delta_32(global_max)
+    assert len(delta) == NUM_PARAMETERS
+    for v in delta:
+        assert abs(v) <= cap + 1e-9
+
+
+def test_memory_delta_32_deterministic():
+    """Same events and global_max_delta → same memory_delta_32."""
+    mem = RelationalMemory("user-det")
+    for i in range(5):
+        mem.add_event(i + 1, "interaction" if i % 2 == 0 else "error")
+    a = mem.get_memory_delta_32(0.15)
+    b = mem.get_memory_delta_32(0.15)
+    assert a == b
+
+
+def test_memory_signature_stable():
+    """T6.3: Same snapshot → same memory_signature."""
+    mem = RelationalMemory("user-sig")
+    mem.add_event(1, "interaction")
+    mem.add_event(2, "interaction")
+    h1 = mem.memory_signature()
+    h2 = mem.memory_signature()
+    assert h1 == h2
+    assert len(h1) == 64  # sha256 hex
+
+
+def test_memory_signature_different_events_different_hash():
+    """Different event history → different memory_signature."""
+    mem1 = RelationalMemory("u")
+    mem2 = RelationalMemory("u")
+    mem1.add_event(1, "interaction")
+    mem2.add_event(1, "error")
+    assert mem1.memory_signature() != mem2.memory_signature()

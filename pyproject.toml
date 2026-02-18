@@ -9,6 +9,7 @@ description = "HnH — deterministic personality simulation engine"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "orjson>=3.9",
     "pydantic>=2.0",
     "structlog>=24.0",
 ]
@@ -73,8 +74,22 @@ markers = [
 [tool.coverage.run]
 source = ["hnh"]
 branch = true
-omit = ["hnh/interface/llm_adapter.py", "tests/*"]
+# Omit optional/legacy: 002 core = identity, config, modulation, memory, state (assembler, replay_v2), logging/state_logger_v2
+omit = [
+    "hnh/interface/*",
+    "hnh/logging/state_logger.py",
+    "hnh/logging/contracts.py",
+    "hnh/astrology/*",
+    "hnh/core/*",
+    "hnh/cli.py",
+    "hnh/config/loader.py",
+    "hnh/state/dynamic_state.py",
+    "hnh/state/modulation.py",
+    "hnh/state/replay.py",
+    "tests/*",
+]
 
 [tool.coverage.report]
-fail_under = 90
+# 002 spec: 99%+ for core modules
+fail_under = 99
 show_missing = true

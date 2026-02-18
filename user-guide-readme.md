@@ -174,6 +174,30 @@ python scripts/01_basic_step.py
 
 ---
 
+## Примеры 002 — иерархическая модель 8×4 (32 параметра)
+
+В папке **`scripts/002/`** — восемь скриптов по спецификации 002: схема 8 осей × 4 подпараметра (32 параметра), чувствительность из натала, границы дельт, сборка состояния, память v2, логирование orjson, replay с допуском 1e-9.
+
+```bash
+python scripts/002/01_schema_and_identity.py
+python scripts/002/08_full_step_v2.py --date 2025-03-01 --log
+```
+
+| Скрипт | Что делает |
+|--------|------------|
+| **01_schema_and_identity.py** | Реестр 8 осей и 32 параметров, маппинг индексов, IdentityCore v0.2 (base_vector, sensitivity_vector). |
+| **02_sensitivity.py** | Вычисление чувствительности из натала (`compute_sensitivity`), гистограмма для отладки. |
+| **03_raw_delta_and_bounds.py** | raw_delta из аспектов, ReplayConfig, apply_bounds (иерархия parameter > axis > global, шок). |
+| **04_state_assembly.py** | Сборка состояния: base + bounded×sensitivity + memory → params_final (32), axis_final (8). |
+| **05_memory_v2.py** | Relational Memory v2: get_memory_delta_32, memory_signature. |
+| **06_logging_v2.py** | Лог v2 (orjson): build_record_v2, write_record_v2. Опции: `--out 002_demo.log`, `--date 2025-02-18`. |
+| **07_replay_v2.py** | Replay v2: N прогонов с одинаковыми входами, replay_match (1e-9), replay_output_hash. |
+| **08_full_step_v2.py** | Полный шаг: identity + config + время + память → ReplayResult. Опции: `--date`, `--log`. |
+
+Подробнее — в [scripts/002/README.md](scripts/002/README.md) и в [specs/002-hierarchical-personality-model/](specs/002-hierarchical-personality-model/).
+
+---
+
 ## Использование как библиотеки
 
 CLI — обёртка над движком. Из Python можно:
@@ -209,7 +233,8 @@ print(state.final_behavior_vector.to_dict())
 
 - **English version of this guide:** [en-user-guide-readme.md](en-user-guide-readme.md)
 - **Полное описание проекта и идеи:** [README.md](README.md)
-- **Спека и план движка:** [specs/001-deterministic-personality-engine/](specs/001-deterministic-personality-engine/)
+- **Спека и план движка (001):** [specs/001-deterministic-personality-engine/](specs/001-deterministic-personality-engine/)
+- **Спека 002 (8×4 модель):** [specs/002-hierarchical-personality-model/](specs/002-hierarchical-personality-model/)
 - **Контракт лога переходов:** [specs/001-deterministic-personality-engine/contracts/state-log-spec.md](specs/001-deterministic-personality-engine/contracts/state-log-spec.md)
 
 Если что-то из CLI непонятно или хочется расширить сценарии (например, свой identity из файла, запись лога в файл) — можно описать это в отдельном тикете или в новой спеку.

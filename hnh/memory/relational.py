@@ -1,13 +1,20 @@
 """
 User-scoped Relational Memory: ordered events (sequence, type, payload).
 Deterministic update rules; serializable snapshot; no Identity Core mutation.
+Spec 002: memory_delta_32, memory_signature for replay.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
-from hnh.memory.update_rules import compute_behavioral_modifier, compute_derived
+from hnh.memory.update_rules import (
+    compute_behavioral_modifier,
+    compute_derived,
+    compute_memory_delta_32,
+)
 
 
 class RelationalMemory:
@@ -45,6 +52,26 @@ class RelationalMemory:
         Same history → same modifier. Reject not applicable here (we clamp in update_rules).
         """
         return compute_behavioral_modifier(self._events)
+
+    def get_memory_delta_32(self, global_max_delta: float) -> tuple[float, ...]:
+        """
+        Deterministic memory_delta vector (32 params) for Spec 002.
+        |memory_delta[p]| ≤ 0.5 × global_max_delta. Same history → same vector.
+        """
+        return compute_memory_delta_32(self._events, global_max_delta)
+
+    def memory_signature(self) -> str:
+        """
+        Hash of snapshot for replay signature. Deterministic: same snapshot → same hash.
+        """
+        snap = self.snapshot()
+        # Canonical: user_id + events (sequence, type, payload)
+        payload = {
+            "user_id": snap["user_id"],
+            "events": snap["events"],
+        }
+        blob = json.dumps(payload, sort_keys=True)
+        return hashlib.sha256(blob.encode()).hexdigest()
 
     def snapshot(self) -> dict[str, Any]:
         """

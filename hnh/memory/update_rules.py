@@ -1,11 +1,14 @@
 """
 Deterministic update rules for Relational Memory.
 Same event history → same derived metrics and behavioral modifier. No Identity mutation.
+Spec 002: memory_delta_32 with |memory_delta[p]| ≤ 0.5 × global_max_delta.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+from hnh.identity.schema import NUM_PARAMETERS, _PARAMETER_LIST
 
 DIMENSION_NAMES = (
     "warmth",
@@ -63,3 +66,42 @@ def compute_behavioral_modifier(events: list[dict[str, Any]]) -> dict[str, float
         "pacing": max(0.0, min(1.0, pacing)),
     }
     return {k: round(v, 6) for k, v in out.items()}
+
+
+def compute_memory_delta_32(
+    events: list[dict[str, Any]],
+    global_max_delta: float,
+) -> tuple[float, ...]:
+    """
+    Deterministic memory_delta vector (32 params) from event history.
+    |memory_delta[p]| ≤ 0.5 × global_max_delta. Does not mutate Identity Core.
+    Same events + same global_max_delta → same vector.
+    """
+    derived = compute_derived(events)
+    n = derived["interaction_count"]
+    err = derived["error_rate"]
+    resp = derived["responsiveness_metric"]
+    cap = 0.5 * global_max_delta
+
+    # Axis-level deltas from metrics (deterministic), then expand to 32
+    # Axis 0 emotional: warmth from responsiveness
+    # Axis 1 stability: stability from error rate (more errors → less stability)
+    # Axis 4 communication: verbosity from interaction count
+    # Axis 5 teaching: correction/challenge from error rate
+    axis_deltas = [
+        (resp - 0.5) * 0.4,   # 0 emotional
+        (0.5 - err) * 0.4,     # 1 stability
+        0.0,                   # 2 cognitive
+        (0.5 - err) * 0.3,    # 3 structure
+        (min(n, 20) / 20.0 - 0.5) * 0.3,  # 4 communication
+        (err - 0.5) * 0.4,    # 5 teaching
+        (resp - 0.5) * 0.2,   # 6 power
+        (min(n, 10) / 10.0 - 0.5) * 0.2,  # 7 motivation
+    ]
+    out: list[float] = []
+    for p_ix in range(NUM_PARAMETERS):
+        axis_ix = _PARAMETER_LIST[p_ix][0]
+        raw = axis_deltas[axis_ix] * cap
+        clamped = max(-cap, min(cap, raw))
+        out.append(round(clamped, 10))
+    return tuple(out)

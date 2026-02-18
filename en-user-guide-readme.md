@@ -174,6 +174,30 @@ See also [scripts/README.md](scripts/README.md) (and [scripts/README.en.md](scri
 
 ---
 
+## 002 examples — hierarchical 8×4 model (32 parameters)
+
+In **`scripts/002/`** there are eight scripts for spec 002: 8 axes × 4 sub-parameters (32 total), natal-derived sensitivity, delta bounds, state assembly, memory v2, orjson logging, and replay with 1e-9 tolerance.
+
+```bash
+python scripts/002/01_schema_and_identity.py
+python scripts/002/08_full_step_v2.py --date 2025-03-01 --log
+```
+
+| Script | What it does |
+|--------|----------------|
+| **01_schema_and_identity.py** | Axis and parameter registry (8 axes, 32 params), index mapping, IdentityCore v0.2 (base_vector, sensitivity_vector). |
+| **02_sensitivity.py** | Sensitivity from natal data (`compute_sensitivity`), debug histogram. |
+| **03_raw_delta_and_bounds.py** | raw_delta from aspects, ReplayConfig, apply_bounds (parameter > axis > global, shock). |
+| **04_state_assembly.py** | State assembly: base + bounded×sensitivity + memory → params_final (32), axis_final (8). |
+| **05_memory_v2.py** | Relational Memory v2: get_memory_delta_32, memory_signature. |
+| **06_logging_v2.py** | V2 logging (orjson): build_record_v2, write_record_v2. Options: `--out 002_demo.log`, `--date 2025-02-18`. |
+| **07_replay_v2.py** | Replay v2: N runs with same inputs, replay_match (1e-9), replay_output_hash. |
+| **08_full_step_v2.py** | Full step: identity + config + time + memory → ReplayResult. Options: `--date`, `--log`. |
+
+See [scripts/002/README.md](scripts/002/README.md) and [specs/002-hierarchical-personality-model/](specs/002-hierarchical-personality-model/).
+
+---
+
 ## Using as a library
 
 The CLI is a thin wrapper. From Python you can:
@@ -208,7 +232,8 @@ More details in the code and in `specs/001-deterministic-personality-engine/`.
 ## See also
 
 - **Project overview and vision:** [README.md](README.md)
-- **Engine spec and plan:** [specs/001-deterministic-personality-engine/](specs/001-deterministic-personality-engine/)
+- **Engine spec and plan (001):** [specs/001-deterministic-personality-engine/](specs/001-deterministic-personality-engine/)
+- **Spec 002 (8×4 model):** [specs/002-hierarchical-personality-model/](specs/002-hierarchical-personality-model/)
 - **State log contract:** [specs/001-deterministic-personality-engine/contracts/state-log-spec.md](specs/001-deterministic-personality-engine/contracts/state-log-spec.md)
 
 Russian version of this guide: [user-guide-readme.md](user-guide-readme.md).

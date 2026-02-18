@@ -20,5 +20,7 @@ python scripts/01_basic_step.py
 | [04_teacher_pilot.py](04_teacher_pilot.py) | Planetary Teacher: создание, пилотный прогон по диапазону дат |
 | [05_multiple_dates_jsonl.py](05_multiple_dates_jsonl.py) | Несколько дат подряд, вывод в формате JSON Lines |
 
+**Скрипты 002 (модель 8×4, 32 параметра):** в подпапке [002/](002/) — восемь демо: схема и IdentityCore v0.2, чувствительность, границы дельт, сборка состояния, память v2, логирование orjson, replay v2, полный шаг. См. [002/README.md](002/README.md).
+
 Подробнее — в [user-guide-readme.md](../user-guide-readme.md).  
 **English:** [README.en.md](README.en.md) and [en-user-guide-readme.md](../en-user-guide-readme.md).
