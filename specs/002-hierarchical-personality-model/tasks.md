@@ -209,6 +209,21 @@ Acceptance:
 
 ---
 
+# Phase 10 — CLI Integration (optional)
+
+## T10.1 CLI invokes 002 flow
+- [x] Entry point `hnh` (or `hnh run-v2`) uses IdentityCore v0.2, ReplayConfig, run_step_v2
+- [ ] Output: params_final (32), axis_final (8); optional: legacy 7-param view or `--legacy` flag
+- [ ] Same deterministic replay and logging (state_logger_v2) when CLI runs a step
+
+Acceptance:
+- `hnh run-v2 --date <date>` produces 32-parameter output (params_final, axis_final); `hnh run --date <date>` for legacy 7-param
+- Replay from CLI log matches run_step_v2 contract
+
+*Note: Scripts in `scripts/002/` already demonstrate the 002 API; this task wires the same flow into the CLI.*
+
+---
+
 # Cross-Cutting Constraints
 
 - No system clock usage

@@ -46,18 +46,20 @@ pip install -e ".[astrology]"
 
 Дата задаётся в формате **YYYY-MM-DD**. Она считается «впрыснутой»: движок не смотрит на системные часы.
 
+Команды: **`run`** (модель 001, 7 параметров), **`run-v2`** (модель 002, 32 параметра). Справка: `hnh --help`, `hnh run --help`, `hnh run-v2 --help`.
+
 ```bash
-hnh --date 2024-06-15
+hnh run --date 2024-06-15
 ```
 
-**Пример вывода (CLI, режим 001 — 7 параметров):**
+**Пример вывода (команда run, режим 001 — 7 параметров):**
 
 ```
 final_behavioral_vector: {'warmth': 0.5, 'strictness': 0.4, 'verbosity': 0.6, 'correction_rate': 0.3, 'humor_level': 0.5, 'challenge_intensity': 0.4, 'pacing': 0.5}
 active_modifiers: {'transit_delta': {'warmth': 0.0, 'strictness': 0.0, ...}, ...}
 ```
 
-Для вывода **32 параметров** (params_final, axis_final) используйте скрипты в `scripts/002/`.
+Для вывода **32 параметров** (params_final, axis_final): команда **`hnh run-v2 --date YYYY-MM-DD`** или скрипты в `scripts/002/`.
 
 - **final_behavioral_vector** (режим 001) — семь параметров; в модели 002 вывод — **params_final** (32) и **axis_final** (8), все в диапазоне 0.0–1.0.
 - **active_modifiers** — чем «подправлен» базовый вектор (transit_delta, relational и т.д.).
@@ -69,7 +71,7 @@ active_modifiers: {'transit_delta': {'warmth': 0.0, 'strictness': 0.0, ...}, ...
 Удобно для скриптов и логов:
 
 ```bash
-hnh --date 2024-01-10 --json
+hnh run --date 2024-01-10 --json
 ```
 
 Пример:
@@ -85,7 +87,7 @@ hnh --date 2024-01-10 --json
 По умолчанию используется seed **0**. Его можно задать явно:
 
 ```bash
-hnh --date 2024-03-20 --seed 42
+hnh run --date 2024-03-20 --seed 42
 ```
 
 Одинаковые `--date` и `--seed` всегда дают один и тот же результат.
@@ -97,7 +99,7 @@ hnh --date 2024-03-20 --seed 42
 Флаг **--replay** запускает расчёт дважды с теми же параметрами и проверяет, что вывод совпадает:
 
 ```bash
-hnh --date 2024-05-01 --replay
+hnh run --date 2024-05-01 --replay
 ```
 
 Если всё ок, вы увидите: `Replay OK: identical output.`  
@@ -106,7 +108,7 @@ hnh --date 2024-05-01 --replay
 С JSON:
 
 ```bash
-hnh --date 2024-05-01 --replay --json
+hnh run --date 2024-05-01 --replay --json
 ```
 
 При успехе выведется та же одна строка JSON (дважды не печатается, только проверка).
@@ -138,19 +140,19 @@ hnh --date 2024-05-01 --replay --json
 
 ```bash
 # Симуляция на 15 июня 2024, вывод в консоль
-hnh --date 2024-06-15
+hnh run --date 2024-06-15
 
 # То же, но одна строка JSON
-hnh --date 2024-06-15 --json
+hnh run --date 2024-06-15 --json
 
 # Другой seed
-hnh --date 2024-06-15 --seed 123
+hnh run --date 2024-06-15 --seed 123
 
 # Проверить, что два прогона дают одинаковый результат
-hnh --date 2024-06-15 --replay
+hnh run --date 2024-06-15 --replay
 
 # Неверная дата — ошибка и подсказка
-hnh --date 2024-13-01
+hnh run --date 2024-13-01
 # Invalid --date: ... Use YYYY-MM-DD.
 ```
 

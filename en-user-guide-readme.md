@@ -46,18 +46,20 @@ Without this extra, the engine uses a single fixed base vector; with it you can 
 
 The date is in **YYYY-MM-DD** format. It is treated as “injected”: the engine does not read the system clock.
 
+Commands: **`run`** (001 model, 7 parameters), **`run-v2`** (002 model, 32 parameters). Help: `hnh --help`, `hnh run --help`, `hnh run-v2 --help`.
+
 ```bash
-hnh --date 2024-06-15
+hnh run --date 2024-06-15
 ```
 
-**Sample output (CLI, 001 mode — 7 parameters):**
+**Sample output (run command, 001 mode — 7 parameters):**
 
 ```
 final_behavioral_vector: {'warmth': 0.5, 'strictness': 0.4, 'verbosity': 0.6, 'correction_rate': 0.3, 'humor_level': 0.5, 'challenge_intensity': 0.4, 'pacing': 0.5}
 active_modifiers: {'transit_delta': {'warmth': 0.0, 'strictness': 0.0, ...}, ...}
 ```
 
-For **32-parameter** output (params_final, axis_final) use the scripts in `scripts/002/`.
+For **32-parameter** output (params_final, axis_final): **`hnh run-v2 --date YYYY-MM-DD`** or scripts in `scripts/002/`.
 
 - **final_behavioral_vector** (001 mode) — seven parameters; in the 002 model the output is **params_final** (32) and **axis_final** (8), all in 0.0–1.0.
 - **active_modifiers** — how the base vector was adjusted (transit_delta, relational, etc.).
@@ -69,7 +71,7 @@ For **32-parameter** output (params_final, axis_final) use the scripts in `scrip
 Useful for scripts and logging:
 
 ```bash
-hnh --date 2024-01-10 --json
+hnh run --date 2024-01-10 --json
 ```
 
 Example:
@@ -85,7 +87,7 @@ Example:
 The default seed is **0**. You can set it explicitly:
 
 ```bash
-hnh --date 2024-03-20 --seed 42
+hnh run --date 2024-03-20 --seed 42
 ```
 
 The same `--date` and `--seed` always produce the same output.
@@ -97,7 +99,7 @@ The same `--date` and `--seed` always produce the same output.
 The **--replay** flag runs the computation twice with the same parameters and checks that the output matches:
 
 ```bash
-hnh --date 2024-05-01 --replay
+hnh run --date 2024-05-01 --replay
 ```
 
 On success you’ll see: `Replay OK: identical output.`  
@@ -106,7 +108,7 @@ If outputs differ, the command exits with code 1.
 With JSON:
 
 ```bash
-hnh --date 2024-05-01 --replay --json
+hnh run --date 2024-05-01 --replay --json
 ```
 
 On success the same single JSON line is printed (no duplicate; it only verifies).
@@ -138,19 +140,19 @@ Output per date: **params_final** (32 values) and **axis_final** (8 aggregates �
 
 ```bash
 # Simulate for 15 June 2024, console output
-hnh --date 2024-06-15
+hnh run --date 2024-06-15
 
 # Same, single JSON line
-hnh --date 2024-06-15 --json
+hnh run --date 2024-06-15 --json
 
 # Different seed
-hnh --date 2024-06-15 --seed 123
+hnh run --date 2024-06-15 --seed 123
 
 # Check that two runs give the same result
-hnh --date 2024-06-15 --replay
+hnh run --date 2024-06-15 --replay
 
 # Invalid date — error and hint
-hnh --date 2024-13-01
+hnh run --date 2024-13-01
 # Invalid --date: ... Use YYYY-MM-DD.
 ```
 

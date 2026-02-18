@@ -41,9 +41,9 @@ def _make_identity():
 
 
 def test_cli_date_and_json_output(capsys: pytest.CaptureFixture[str]) -> None:
-    """T040: CLI with --date and --json prints valid state JSON."""
-    with patch("hnh.cli._default_identity", side_effect=_make_identity):
-        with patch("sys.argv", ["hnh", "--date", "2024-06-15", "--json"]):
+    """T040: CLI run with --date and --json prints valid state JSON."""
+    with patch("hnh.cli._default_identity_001", side_effect=_make_identity):
+        with patch("sys.argv", ["hnh", "run", "--date", "2024-06-15", "--json"]):
             main()
     out = capsys.readouterr().out.strip()
     data = json.loads(out)
@@ -57,9 +57,9 @@ def test_cli_date_and_json_output(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_cli_replay_mode_identical_output(capsys: pytest.CaptureFixture[str]) -> None:
-    """T040: --replay runs twice and verifies identical output."""
-    with patch("hnh.cli._default_identity", side_effect=_make_identity):
-        with patch("sys.argv", ["hnh", "--date", "2024-01-01", "--replay"]):
+    """T040: run --replay runs twice and verifies identical output."""
+    with patch("hnh.cli._default_identity_001", side_effect=_make_identity):
+        with patch("sys.argv", ["hnh", "run", "--date", "2024-01-01", "--replay"]):
             main()
     out = capsys.readouterr().out
     assert "Replay OK" in out or "identical" in out.lower()
@@ -67,7 +67,7 @@ def test_cli_replay_mode_identical_output(capsys: pytest.CaptureFixture[str]) ->
 
 def test_cli_invalid_date_exits_nonzero() -> None:
     """CLI rejects invalid --date."""
-    with patch("sys.argv", ["hnh", "--date", "not-a-date"]):
+    with patch("sys.argv", ["hnh", "run", "--date", "not-a-date"]):
         with patch("sys.exit") as mock_exit:
             with patch("sys.stderr", StringIO()):
                 main()

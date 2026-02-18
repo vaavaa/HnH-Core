@@ -298,6 +298,7 @@ Feature complete when:
 - Shock event handling (versioned multiplier, logged)
 - Replay harness (configuration_hash, tolerance 1e-9)
 - Structured logging (orjson)
+- **CLI entry point**: subcommands and per-command help; 002 flow (params_final, axis_final); optional legacy 7-param output
 - Test suite, fixtures, 99% coverage gate
 
 ---
