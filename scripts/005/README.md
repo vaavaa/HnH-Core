@@ -14,13 +14,13 @@ python scripts/005/01_lifecycle_formulas_demo.py
 
 | Скрипт | Описание |
 |--------|----------|
-| [01_lifecycle_formulas_demo.py](01_lifecycle_formulas_demo.py) | Демо формул без зависимости от hnh.lifecycle: S_T, load/recovery, F(t+1), L, q, A_g, психовозраст за несколько шагов с фиктивными S_T, R, S_g. Опции: `--days`, `--stress` |
-| 02_transit_stress.py | I_T(t), S_T(t) из аспектов по контракту transit-stress; при наличии 002/004 — реальные транзиты. *(После реализации hnh/lifecycle)* |
-| 03_fatigue_engine.py | Движок усталости: load, recovery, F, L, q за N дней; вывод траектории F(t), q(t). *(После реализации)* |
-| 04_activity_suppression.py | A_g(q), effective_transit_delta и effective_memory_delta, деградация шести параметров. *(После реализации)* |
-| 05_death_and_will.py | Условие смерти F >= L, финальный снапшот, delta_W и обновление W при смерти. *(После реализации)* |
-| 06_transcendence.py | Порог W >= 0.995, state TRANSCENDED, заморозка профиля. *(После реализации)* |
-| 07_lifecycle_replay.py | Полный шаг с lifecycle (research + lifecycle_enabled): подпись реплея, проверка детерминизма. *(После реализации)* |
-| 08_life_simulation_lifecycle.py | Симуляция жизни с lifecycle: F, W, A_g, state по дням; при смерти — снапшот. Опции: `--days`, `--lives`, `--seed`, `--no-lifecycle`. *(После реализации)* |
+| [01_lifecycle_formulas_demo.py](01_lifecycle_formulas_demo.py) | Демо формул: S_T, load/recovery, F, L, q, A_g, психовозраст. Опции: `--days`, `--stress`, `--use-module` |
+| [02_transit_stress.py](02_transit_stress.py) | I_T(t), S_T(t) из аспектов (контракт transit-stress); при астрологии — `--date`, `--lat`, `--lon` |
+| [03_fatigue_engine.py](03_fatigue_engine.py) | Движок усталости: траектория F(t), q(t) за N дней. Опции: `--days`, `--stress`, `--r`, `--s-g` |
+| [04_activity_suppression.py](04_activity_suppression.py) | A_g(q), effective deltas, деградация 6 параметров. Опция `--q` для одного значения |
+| [05_death_and_will.py](05_death_and_will.py) | Смерть F >= L, снапшот, delta_W. Опции: `--stress`, `--days`, `--r`, `--s-g` |
+| [06_transcendence.py](06_transcendence.py) | W >= 0.995, state TRANSCENDED (демо с W(0)=0.996) |
+| [07_lifecycle_replay.py](07_lifecycle_replay.py) | Детерминизм: два прогона с одинаковыми входами. Опция `--steps` |
+| [08_life_simulation_lifecycle.py](08_life_simulation_lifecycle.py) | Симуляция жизней с lifecycle: F, W, state; при смерти — снапшот. Опции: `--days`, `--lives`, `--seed`, `--no-lifecycle`, `--no-astrology` |
 
 Спека: [specs/005-lifecycle-entropy-research/](../specs/005-lifecycle-entropy-research/).

@@ -82,10 +82,45 @@ def run_demo(days: int, stress_level: float, r: float = 0.5, s_g: float = 0.5) -
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="005 Lifecycle formulas demo (no hnh.lifecycle)")
+    ap = argparse.ArgumentParser(description="005 Lifecycle formulas demo")
     ap.add_argument("--days", type=int, default=30, help="Number of days to simulate")
     ap.add_argument("--stress", type=float, default=1.5, help="Fake raw I_T for S_T = I_T/C_T (default 1.5 -> S_T=0.5)")
+    ap.add_argument("--use-module", action="store_true", help="Use hnh.lifecycle module if available")
     args = ap.parse_args()
+    if args.use_module:
+        try:
+            from hnh.lifecycle.fatigue import (
+                load as lc_load,
+                recovery as lc_recovery,
+                update_fatigue,
+                fatigue_limit,
+                normalized_fatigue,
+            )
+            from hnh.lifecycle.engine import activity_factor as lc_activity_factor, age_psy_years
+            from hnh.lifecycle.constants import DEFAULT_LIFECYCLE_CONSTANTS
+
+            def run_with_module() -> None:
+                c = DEFAULT_LIFECYCLE_CONSTANTS
+                s_t = stress_normalized(args.stress)
+                r, s_g = 0.5, 0.5
+                L = fatigue_limit(r, s_g, c)
+                f = 0.0
+                print(f"[hnh.lifecycle] S_T={s_t:.4f}, R={r}, S_g={s_g}, L={L:.2f}")
+                print(f"{'day':>4} {'F':>8} {'q':>6} {'A_g':>6} {'Age_psy_y':>8}")
+                print("-" * 40)
+                for day in range(args.days):
+                    ld = lc_load(s_t, r, s_g, c)
+                    rec = lc_recovery(s_t, r, c)
+                    f = update_fatigue(f, ld, rec, c)
+                    q = normalized_fatigue(f, L)
+                    a_g = lc_activity_factor(q, c)
+                    age_y = age_psy_years(float(day), q, c)
+                    print(f"{day:4d} {f:8.4f} {q:6.3f} {a_g:6.3f} {age_y:8.2f}")
+
+            run_with_module()
+            return
+        except ImportError:
+            print("hnh.lifecycle not available, using built-in formulas")
     run_demo(args.days, args.stress)
 
 

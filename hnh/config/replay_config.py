@@ -22,6 +22,7 @@ class ReplayConfig:
     Subset of config used for replay signature.
     Delta limits (global, axis, parameter), shock threshold, shock_multiplier, orb/weights.
     shock_multiplier must be ≤ ENGINE_SHOCK_MULTIPLIER_HARD_CAP (2.0).
+    Spec 005: mode, lifecycle_enabled, initial_f, initial_w for Lifecycle & Entropy (research only).
     """
 
     global_max_delta: float
@@ -29,6 +30,11 @@ class ReplayConfig:
     shock_multiplier: float
     axis_max_delta: tuple[tuple[str, float], ...] = ()
     parameter_max_delta: tuple[tuple[str, float], ...] = ()
+    # 005 Lifecycle (Research Mode only)
+    mode: str = "product"
+    lifecycle_enabled: bool = False
+    initial_f: float = 0.0
+    initial_w: float = 0.0
 
     def __post_init__(self) -> None:
         if self.shock_multiplier > ENGINE_SHOCK_MULTIPLIER_HARD_CAP:
@@ -48,7 +54,7 @@ class ReplayConfig:
 def compute_configuration_hash(config: ReplayConfig) -> str:
     """
     xxhash of replay-relevant fields only (canonical orjson). Spec 003.
-    Deterministic; same config → same hash.
+    When lifecycle_enabled (005), includes mode, initial_f, initial_w. Deterministic.
     """
     payload = {
         "global_max_delta": config.global_max_delta,
@@ -57,6 +63,11 @@ def compute_configuration_hash(config: ReplayConfig) -> str:
         "axis_max_delta": dict(sorted(config.axis_max_delta_dict.items())),
         "parameter_max_delta": dict(sorted(config.parameter_max_delta_dict.items())),
     }
+    if getattr(config, "lifecycle_enabled", False):
+        payload["mode"] = getattr(config, "mode", "product")
+        payload["lifecycle_enabled"] = True
+        payload["initial_f"] = getattr(config, "initial_f", 0.0)
+        payload["initial_w"] = getattr(config, "initial_w", 0.0)
     blob = orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)
     return xxhash.xxh3_128(blob, seed=0).hexdigest()
 
