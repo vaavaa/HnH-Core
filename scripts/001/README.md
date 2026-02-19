@@ -22,5 +22,7 @@ python scripts/01_basic_step.py
 
 **Скрипты 002 (модель 8×4, 32 параметра):** в подпапке [002/](002/) — восемь демо: схема и IdentityCore v0.2, чувствительность, границы дельт, сборка состояния, память v2, логирование orjson, replay v2, полный шаг. См. [002/README.md](002/README.md).
 
+**Скрипты 005 (Lifecycle & Entropy, Research Mode):** в подпапке [005/](005/) — демо усталости, активности, смерти, воли, трансценденции. См. [005/README.md](005/README.md).
+
 Подробнее — в [user-guide-readme.md](../user-guide-readme.md).  
 **English:** [README.en.md](README.en.md) and [en-user-guide-readme.md](../en-user-guide-readme.md).
