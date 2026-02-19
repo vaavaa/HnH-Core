@@ -38,9 +38,9 @@ Running aggregates (O(1) per day) for will update at death:
 | Symbol | Source | Notes |
 |--------|--------|--------|
 | S_T(t) | Aspects | clip(I_T/C_T, 0, 1) |
-| R | Stability axis | Mean of 4 params (axis index 1) |
+| R | base_vector (Stability axis) | Mean of 4 params (axis index 1); constant per identity (spec §3, Clarifications) |
 | S_g | Identity | Mean of 32 sensitivity params |
-| A(t) | Time | Chronological age in days (or years) |
+| A(t) | Time | Chronological age in **days** |
 
 ## 3. Config (replay-relevant when lifecycle enabled)
 
