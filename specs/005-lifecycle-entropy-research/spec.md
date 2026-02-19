@@ -10,7 +10,13 @@
 
 ## Clarifications
 
-*(To be filled after clarification sessions.)*
+### Session 2025-02-19
+
+- Q: Откуда берётся R (resilience) для load/recovery и L: из base_vector или из params_final на шаге t? → A: R = mean of 4 parameters of Stability axis from **base_vector** (constant per identity).
+- Q: В каких единицах A(t) и Age_psy в формуле психологического возраста? → A: A(t) в днях; Age_psy выводится в годах (конвертация при выводе).
+- Q: Если F(0) ≥ L или W(0) ≥ 0.995 в начале прогона — как вести себя? → A: Сразу применить death/transcendence **до** первого шага (state = DISABLED или TRANSCENDED, шаг 0 не выполнять).
+- Q: Финальный снапшот: требовать orjson и/или фиксированную схему? → A: **orjson** обязателен для сериализации снапшота при записи в лог; точная схема полей — в плане/контракте.
+- Q: Что такое «accelerated mode» в «median lifespan > 800 years (accelerated mode)»? → A: Не отдельный режим: целевая метрика валидации при **дефолтных** константах спеки (проверка в тестах/скриптах).
 
 ---
 
@@ -60,7 +66,7 @@ In **Product Mode**:
 | q(t)     | [0, 1]             | q(t) = clip(F(t)/L, 0, 1) |
 | A_g(t)   | [0, 1]             | Activity factor |
 | W        | [0, 1]             | Spiritual will |
-| R        | [0, 1]             | Resilience (derived from Stability axis, Spec 002) |
+| R        | [0, 1]             | Resilience: mean of 4 params of Stability axis from **base_vector** (constant per identity; Spec 002) |
 | S_g      | [0, 1]             | Global sensitivity (mean of 32 sensitivity parameters) |
 | S_T(t)   | [0, 1]             | Normalized daily transit stress |
 
@@ -152,10 +158,10 @@ L = L0 × (1 + delta_r × R) × (1 - delta_s × S_g)
 
 **Defaults:** `L0 = 14.0`, `delta_r = 0.8`, `delta_s = 0.5`
 
-**Expected outcome:**
+**Expected outcome (validation target with default constants):**
 
-- Median lifespan > 800 years (accelerated mode)
-- Death rare unless repeated high-stress cycles
+- Median lifespan > 800 years when running many agents with spec defaults (to be checked in tests/scripts; no separate "accelerated" config).
+- Death rare unless repeated high-stress cycles.
 
 ---
 
@@ -210,13 +216,15 @@ Suppression MUST NOT exceed 0.1 absolute reduction per parameter.
 
 ## 8. Psychological Age
 
-**Chronological age:** A(t)
+**Chronological age:** A(t) — в **днях** (согласовано с time step 1 day).
 
-**Psychological age:**
+**Psychological age (формула в днях):**
 
 ```
-Age_psy(t) = A(t) × (eta_0 + eta_1 × q(t)^kappa)
+Age_psy_raw(t) = A(t) × (eta_0 + eta_1 × q(t)^kappa)
 ```
+
+**Output:** Age_psy в **годах**; реализация MUST конвертировать при выводе (например Age_psy_years = Age_psy_raw / 365.25 или эквивалент). Лог и API отдают возраст в годах.
 
 **Defaults:** `eta_0 = 0.80`, `eta_1 = 0.45`, `kappa = 2.0`
 
@@ -237,6 +245,8 @@ Low fatigue → psychologically younger. High fatigue → accelerated aging.
 
 Death MUST occur only under sustained high stress.
 
+**Edge case — start of run:** If F(0) ≥ L or W(0) ≥ 0.995 at initialization, the engine MUST apply death or transcendence **before** the first step: set state = DISABLED (if F(0) ≥ L) or TRANSCENDED (if W(0) ≥ 0.995), do not run step 0, log snapshot if applicable.
+
 ### 9.1 Final snapshot contents
 
 When state becomes DISABLED (or TRANSCENDED), the engine MUST produce a **lifecycle snapshot** that is logged and MAY be included in the replay payload. Snapshot MUST contain at least:
@@ -253,9 +263,11 @@ When state becomes DISABLED (or TRANSCENDED), the engine MUST produce a **lifecy
 | count_days | int | Days lived |
 | params_final | tuple[float, ...] | 32 params at freeze |
 | axis_final | tuple[float, ...] | 8 axes at freeze |
-| Age_psy | float (optional) | Psychological age at end |
+| Age_psy | float (optional) | Psychological age at end, in years |
 
 Additional implementation-defined fields are allowed; replay-relevant fields MUST be listed in the implementation contract so that replay consistency is verifiable.
+
+**Serialization:** When the snapshot is written to a log or external storage, it MUST be serialized with **orjson** (per Spec 003). Exact field schema and ordering are defined in the implementation plan or contract.
 
 ### 9.2 Replay signature (lifecycle)
 
@@ -316,6 +328,8 @@ Growth MUST be slow and rare.
 - No further rebirth
 
 Transcendence probability MUST be < 1% across 10,000 simulated agents.
+
+**Edge case — start of run:** If W(0) ≥ 0.995, set state = TRANSCENDED before the first step (§9 edge case).
 
 ---
 
