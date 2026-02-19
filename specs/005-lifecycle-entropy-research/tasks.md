@@ -31,7 +31,7 @@
 
 - [ ] T004 Implement raw transit intensity I_T(t) = Σ(hard_aspect_weight × orb_decay) per contracts/transit-stress.md (hard aspects: Conjunction, Opposition, Square; orb_decay = max(0, 1 - dev/orb)); reuse 002/004 aspect list
 - [ ] T005 Implement S_T(t) = clip(I_T(t)/C_T, 0, 1) with C_T=3.0; unit test that 95th percentile S_T < 0.9 on representative aspect sets
-- [ ] T006 Implement R from Stability axis (axis index 1): R = mean of 4 params of stability_regulation from current params or base; range [0,1]
+- [ ] T006 Implement R from Stability axis (axis index 1): R = mean of 4 params of stability_regulation from **base_vector** (constant per identity; spec §3, Clarifications); range [0,1]
 - [ ] T007 Implement S_g = mean of 32 sensitivity parameters; input from Identity
 - [ ] T008 Implement load(t), recovery(t), F(t+1) update per spec §5; all constants from config with defaults from spec
 - [ ] T009 Implement L = L0*(1+delta_r*R)*(1-delta_s*S_g); q(t) = clip(F(t)/L, 0, 1)
@@ -49,7 +49,7 @@
 
 ## Phase 4: Psychological Age, Death, Will, Transcendence
 
-- [ ] T014 Implement Age_psy(t) = A(t)*(eta_0 + eta_1*q^kappa); optional in log
+- [ ] T014 Implement Age_psy(t): compute in days (A(t)*(eta_0 + eta_1*q^kappa)), **output in years** (convert when logging/API per spec §8); optional in log
 - [ ] T015 Implement death condition: if F(t) >= L then state=DISABLED; freeze params; stop memory/transit updates; log final snapshot
 - [ ] T016 Implement daily v(t)=A_g*S_T, burn(t)=max(0, q - q_crit); at death compute delta_W = eta_w*mean(v) - xi_w*mean(burn); clamp delta_W in [-0.03, +0.02]; W = clip(W + delta_W, 0, 1)
 - [ ] T017 Implement transcendence: if W >= 0.995 then state=TRANSCENDED; fatigue disabled; no further modulation; personality frozen
