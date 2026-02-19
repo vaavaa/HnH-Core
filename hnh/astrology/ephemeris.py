@@ -15,7 +15,8 @@ try:
 except ImportError:
     swe = None  # type: ignore[assignment]
 
-# Standard planet IDs for natal (v0.1)
+# Standard planet IDs for natal (Spec 004: 10 planets)
+# Swiss Ephemeris: 0=Sun .. 6=Saturn, 7=Uranus, 8=Neptune, 9=Pluto
 PLANETS_NATAL = [
     ("Sun", 0),
     ("Moon", 1),
@@ -24,6 +25,9 @@ PLANETS_NATAL = [
     ("Mars", 4),
     ("Jupiter", 5),
     ("Saturn", 6),
+    ("Uranus", 7),
+    ("Neptune", 8),
+    ("Pluto", 9),
 ]
 
 # Lat/lon bounds
@@ -67,7 +71,7 @@ def datetime_to_julian_utc(dt: datetime) -> float:
 
 def compute_positions(jd_ut: float) -> list[dict[str, Any]]:
     """
-    Считает эклиптические долготы стандартных планет (Sun..Saturn) на заданный юлианский день UT.
+    Считает эклиптические долготы 10 планет (Sun..Pluto) на заданный юлианский день UT.
     Возвращает список словарей {"planet": str, "longitude": float} в фиксированном порядке.
     """
     if swe is None:

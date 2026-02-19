@@ -20,7 +20,7 @@ def compute_transit_signature(
     """
     Строит детерминированную транзитную сигнатуру для заданного времени и натальных позиций.
     Одинаковые время и натал дают один и тот же вывод. Системные часы не используются.
-    Возвращает: timestamp_utc, jd_ut, positions (транзиты с долготой до 6 знаков), aspects_to_natal.
+    Positions: 10 планет (Spec 004) с долготой до 6 знаков. Возвращает: timestamp_utc, jd_ut, positions, aspects_to_natal.
     """
     if injected_time_utc.tzinfo is None:
         injected_time_utc = injected_time_utc.replace(tzinfo=timezone.utc)

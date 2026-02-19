@@ -104,12 +104,15 @@ def test_build_natal_rejects_invalid_location():
 
 
 def test_compute_positions_returns_deterministic_order():
-    """T015: compute_positions returns standard planets in fixed order."""
+    """T015: compute_positions returns 10 planets (Spec 004) in fixed order."""
     pytest.importorskip("swisseph")
     jd = eph.datetime_to_julian_utc(datetime(1990, 6, 15, 12, 0, 0, tzinfo=timezone.utc))
     positions = eph.compute_positions(jd)
     names = [p["planet"] for p in positions]
-    assert names == ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"]
+    assert names == [
+        "Sun", "Moon", "Mercury", "Venus", "Mars",
+        "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto",
+    ]
     for p in positions:
         assert "longitude" in p
         assert 0 <= p["longitude"] < 360
@@ -148,7 +151,7 @@ def test_orb_config_defaults():
 
 
 def test_natal_positions_structure():
-    """T017: build_natal_positions returns required keys."""
+    """T017: build_natal_positions returns required keys (Spec 004: 10 planets, sign, house, angular_strength)."""
     pytest.importorskip("swisseph")
     dt = datetime(1990, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
     out = natal.build_natal_positions(dt, 55.75, 37.62)
@@ -157,5 +160,10 @@ def test_natal_positions_structure():
     assert "jd_ut" in out
     assert "positions" in out
     assert "aspects" in out
-    assert len(out["positions"]) == 7
-    assert all("planet" in p and "longitude" in p for p in out["positions"])
+    assert "houses" in out
+    assert len(out["positions"]) == 10
+    for p in out["positions"]:
+        assert "planet" in p and "longitude" in p
+        assert "sign" in p and 0 <= p["sign"] <= 11
+        assert "house" in p and 1 <= p["house"] <= 12
+        assert "angular_strength" in p and 0 <= p["angular_strength"] <= 1

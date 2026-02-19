@@ -24,8 +24,8 @@
 
 **Purpose**: Ensure dependencies and structure for 004; no new top-level project.
 
-- [ ] T001 Verify pyswisseph supports 10 planets and house calculation (swe.calc_ut for Uranus/Neptune/Pluto; swe.houses) in hnh/astrology/ephemeris.py environment
-- [ ] T002 [P] Implement angular strength from house using scale in specs/004-planetary-core-zodiac-expression/contracts/angular-strength.md (Angular=1.0, Succedent=0.6, Cadent=0.3)
+- [x] T001 Verify pyswisseph supports 10 planets and house calculation (swe.calc_ut for Uranus/Neptune/Pluto; swe.houses) in hnh/astrology/ephemeris.py environment
+- [x] T002 [P] Implement angular strength from house using scale in specs/004-planetary-core-zodiac-expression/contracts/angular-strength.md (Angular=1.0, Succedent=0.6, Cadent=0.3)
 
 ---
 
@@ -35,12 +35,12 @@
 
 **Independent Test**: Given birth datetime (UTC) + lat/lon, natal output contains 10 planets, each with longitude, sign (0–11), house (1–12), and angular strength; same input → same output.
 
-- [ ] T003 [US1] Extend PLANETS_NATAL to 10 planets (add Uranus, Neptune, Pluto with Swiss Ephemeris IDs 7,8,9) in hnh/astrology/ephemeris.py
-- [ ] T004 [US1] Implement house cusp computation (Placidus default; JD + geolat + geolon → cusps, ascmc) in hnh/astrology/ephemeris.py or new hnh/astrology/houses.py
-- [ ] T005 [US1] Implement longitude_to_house_number(lon, cusps) and assign house 1–12 per planet in hnh/astrology/ephemeris.py or hnh/astrology/houses.py
-- [ ] T006 [US1] Add angular strength from house only (1,4,7,10 = angular; scale per contract) in hnh/astrology/ephemeris.py or hnh/astrology/houses.py
-- [ ] T007 [US1] Update build_natal_positions to request 10 planets and houses; attach sign, house, angular_strength to each position in hnh/core/natal.py
-- [ ] T008 [US1] Update compute_transit_signature to use 10 planets (and optionally houses for event chart) in hnh/astrology/transits.py
+- [x] T003 [US1] Extend PLANETS_NATAL to 10 planets (add Uranus, Neptune, Pluto with Swiss Ephemeris IDs 7,8,9) in hnh/astrology/ephemeris.py
+- [x] T004 [US1] Implement house cusp computation (Placidus default; JD + geolat + geolon → cusps, ascmc) in hnh/astrology/ephemeris.py or new hnh/astrology/houses.py
+- [x] T005 [US1] Implement longitude_to_house_number(lon, cusps) and assign house 1–12 per planet in hnh/astrology/ephemeris.py or hnh/astrology/houses.py
+- [x] T006 [US1] Add angular strength from house only (1,4,7,10 = angular; scale per contract) in hnh/astrology/ephemeris.py or hnh/astrology/houses.py
+- [x] T007 [US1] Update build_natal_positions to request 10 planets and houses; attach sign, house, angular_strength to each position in hnh/core/natal.py
+- [x] T008 [US1] Update compute_transit_signature to use 10 planets (and optionally houses for event chart) in hnh/astrology/transits.py
 
 **Checkpoint**: Natal and transits output 10 planets with sign, house, angular strength. Deterministic.
 
@@ -52,11 +52,11 @@
 
 **Independent Test**: Same natal + time → same sign_energy_vector and dominant_sign/dominant_element; all values in [0,1]; no read of params_final/base.
 
-- [ ] T009 [P] [US2] Implement SIGN_RULER (Modern default) from contracts/sign-rulers.md in hnh/astrology/zodiac_expression.py (or hnh/astrology/rulers.py)
-- [ ] T010 [US2] Implement ruler strength from ruler planet position and aspects in hnh/astrology/zodiac_expression.py
-- [ ] T011 [US2] Implement Z[sign] (12×4) from planetary_presence, ruler_strength, aspects, angular weighting, tension_vs_harmony per spec §4.2 input–dimension table; normalization [0,1]; sign with no planets: ruler+aspects only or (0,0,0,0) in hnh/astrology/zodiac_expression.py
-- [ ] T012 [US2] Implement dominant_sign (sign with max intensity) and dominant_element (element with max sum of intensity over 3 signs) per spec §9 in hnh/astrology/zodiac_expression.py
-- [ ] T013 [US2] Expose pure function or entry that returns sign_energy_vector, dominant_sign, dominant_element given positions (with sign/house/angular_strength) and aspects in hnh/astrology/zodiac_expression.py
+- [x] T009 [P] [US2] Implement SIGN_RULER (Modern default) from contracts/sign-rulers.md in hnh/astrology/zodiac_expression.py (or hnh/astrology/rulers.py)
+- [x] T010 [US2] Implement ruler strength from ruler planet position and aspects in hnh/astrology/zodiac_expression.py
+- [x] T011 [US2] Implement Z[sign] (12×4) from planetary_presence, ruler_strength, aspects, angular weighting, tension_vs_harmony per spec §4.2 input–dimension table; normalization [0,1]; sign with no planets: ruler+aspects only or (0,0,0,0) in hnh/astrology/zodiac_expression.py
+- [x] T012 [US2] Implement dominant_sign (sign with max intensity) and dominant_element (element with max sum of intensity over 3 signs) per spec §9 in hnh/astrology/zodiac_expression.py
+- [x] T013 [US2] Expose pure function or entry that returns sign_energy_vector, dominant_sign, dominant_element given positions (with sign/house/angular_strength) and aspects in hnh/astrology/zodiac_expression.py
 
 **Checkpoint**: Zodiac layer produces 12×4 and dominant_* deterministically; no behavioral feedback.
 
