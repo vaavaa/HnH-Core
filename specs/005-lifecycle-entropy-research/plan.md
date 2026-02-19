@@ -1,7 +1,8 @@
 # Implementation Plan: 005 — Lifecycle & Entropy Model (Research Mode Only)
 
 **Branch**: `005-lifecycle-entropy-research` | **Date**: 2025-02-19 | **Spec**: [spec.md](spec.md)  
-**Input**: Feature specification from `specs/005-lifecycle-entropy-research/spec.md`.
+**Input**: Feature specification from `specs/005-lifecycle-entropy-research/spec.md`.  
+**Clarifications**: Session 2025-02-19 (see spec § Clarifications) — R from base_vector; Age_psy output in years; edge case F(0)≥L / W(0)≥0.995 before first step; orjson for snapshot; median lifespan > 800y = validation target with defaults.
 
 ---
 
@@ -40,16 +41,16 @@ Introduce a deterministic **Lifecycle & Entropy** layer: fatigue F(t), limit L, 
    Per contract [contracts/transit-stress.md](contracts/transit-stress.md): hard aspects = Conjunction, Opposition, Square; orb_decay = max(0, 1 − dev/orb). Module: compute I_T(t) = Σ(hard_aspect_weight × orb_decay); S_T(t) = clip(I_T/C_T, 0, 1). C_T = 3.0 default; calibrate so 95th percentile S_T < 0.9.
 
 3. **Fatigue engine**  
-   Inputs: S_T(t), R (from Stability axis), S_g (mean sensitivity). Compute load(t), recovery(t); update F(t+1) = max(0, F(t) + lambda_up*load - lambda_down*recovery). L = L0*(1+delta_r*R)*(1-delta_s*S_g). q(t) = clip(F(t)/L, 0, 1).
+   Inputs: S_T(t), R (from **base_vector** Stability axis — constant per identity), S_g (mean sensitivity). Compute load(t), recovery(t); update F(t+1) = max(0, F(t) + lambda_up*load - lambda_down*recovery). L = L0*(1+delta_r*R)*(1-delta_s*S_g). q(t) = clip(F(t)/L, 0, 1). At init: if F(0)≥L or W(0)≥0.995, set state DISABLED/TRANSCENDED before first step.
 
 4. **Activity suppression**  
    A_g(t) = clip(1 - q^rho, 0, 1), rho=2.5. Apply to transit_delta and memory_delta (effective = A_g × raw). Behavioral degradation for activity-sensitive params (initiative, curiosity, persistence, pacing, challenge_level, verbosity): x_p -= delta_p*(1-A_g), clamp; cap absolute reduction at 0.1.
 
 5. **Psychological age**  
-   Age_psy(t) = A(t) × (eta_0 + eta_1 × q(t)^kappa). Optional log field in research mode.
+   Age_psy_raw(t) = A(t) × (eta_0 + eta_1 × q(t)^kappa) with A(t) in days; **output Age_psy in years** (convert when logging/API). Optional log field in research mode.
 
 6. **Death**  
-   If F(t) >= L: state = DISABLED; freeze params; stop memory/transit updates; log final snapshot. Compute delta_W from lifetime v(t) and burn(t); update W = clip(W + delta_W, 0, 1); clamp delta_W in [-0.03, +0.02].
+   If F(t) >= L: state = DISABLED; freeze params; stop memory/transit updates; log final snapshot (**orjson** when writing to log; schema in plan/contract). Compute delta_W from lifetime v(t) and burn(t); update W = clip(W + delta_W, 0, 1); clamp delta_W in [-0.03, +0.02].
 
 7. **Will & transcendence**  
    Daily v(t) = A_g*S_T, burn(t) = max(0, q - q_crit). Will update only at death. If W >= 0.995: state = TRANSCENDED; fatigue off; no further modulation; personality frozen.
@@ -124,5 +125,5 @@ Introduce a deterministic **Lifecycle & Entropy** layer: fatigue F(t), limit L, 
 ## Risks & Mitigations
 
 - **Float drift**: Use running averages with bounded history or closed form; avoid cumulative sum over 2000 years without periodic normalization or stable formulation.
-- **Death too frequent**: Tune lambda_up/lambda_down, L0, delta_r, delta_s; validation target median lifespan > 800y in accelerated mode.
+- **Death too frequent**: Tune lambda_up/lambda_down, L0, delta_r, delta_s; validation target median lifespan > 800y with **default constants** (no separate "accelerated" mode; check in tests/scripts).
 - **Transcendence too easy**: Keep W update clamped and xi_w high; validate < 1% transcendence in 10k agents.
