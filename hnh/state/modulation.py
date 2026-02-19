@@ -63,15 +63,13 @@ def merge_vectors(
     result: dict[str, float] = {}
     for dim in DIMENSION_NAMES:
         val = base_dict[dim] + transit_delta.get(dim, 0.0)
-        result[dim] = max(0.0, min(1.0, val))
-    if relational_modifier is not None:
-        for dim in DIMENSION_NAMES:
+        if relational_modifier is not None:
             v = relational_modifier.get(dim)
             if v is not None:
                 if not (0.0 <= v <= 1.0):
                     raise ValueError(
                         f"Relational modifier dimension {dim!r} must be in [0, 1], got {v}"
                     )
-                result[dim] = (result[dim] + v) / 2.0
-                result[dim] = max(0.0, min(1.0, result[dim]))
+                val = (val + v) / 2.0
+        result[dim] = max(0.0, min(1.0, val))
     return BehavioralVector(**result)

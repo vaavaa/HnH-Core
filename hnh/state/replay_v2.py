@@ -88,10 +88,12 @@ def run_step_v2(
     phase_limit = 0.5*global_max_delta. Blended as final = base + (0.7*daily + 0.3*(phase_p+phase_s+phase_o)) + memory.
     """
     if injected_time_utc.tzinfo is None:
-        injected_time_utc = injected_time_utc.replace(tzinfo=timezone.utc)
+        dt_utc = injected_time_utc.replace(tzinfo=timezone.utc)
     elif injected_time_utc.tzinfo != timezone.utc:
-        injected_time_utc = injected_time_utc.astimezone(timezone.utc)
-    injected_iso = injected_time_utc.isoformat()
+        dt_utc = injected_time_utc.astimezone(timezone.utc)
+    else:
+        dt_utc = injected_time_utc
+    injected_iso = dt_utc.isoformat()
 
     config_hash = compute_configuration_hash(config)
     memory_delta = memory_delta if memory_delta is not None else (0.0,) * NUM_PARAMETERS
@@ -103,14 +105,16 @@ def run_step_v2(
     raw_by_cat: dict[str, tuple[float, ...]] | None = None
 
     if tr is not None and natal_positions is not None:
-        transit_data = tr.compute_transit_signature(injected_time_utc, natal_positions)
+        transit_data = tr.compute_transit_signature(dt_utc, natal_positions)
         aspects = transit_data.get("aspects_to_natal", [])
         if transit_effect_phase_prev_by_category is not None:
             raw_by_cat = compute_raw_delta_32_by_category(aspects)
-            raw_delta_list = [
-                raw_by_cat["personal"][i] + raw_by_cat["social"][i] + raw_by_cat["outer"][i]
-                for i in range(NUM_PARAMETERS)
-            ]
+            for i in range(NUM_PARAMETERS):
+                raw_delta_list[i] = (
+                    raw_by_cat["personal"][i]
+                    + raw_by_cat["social"][i]
+                    + raw_by_cat["outer"][i]
+                )
         else:
             raw_delta_list = list(compute_raw_delta_32(aspects))
     raw_delta = tuple(raw_delta_list)
@@ -131,25 +135,32 @@ def run_step_v2(
         # phase[t] = clamp(phase[t-1]*decay + daily[t]*phase_gain, -phase_limit, +phase_limit)
         phase_limit = 0.5 * config.global_max_delta
         phase_after = {}
-        phase_parts = []
+        phase_parts: list[tuple[float, ...]] = []
         for cat in ("personal", "social", "outer"):
             prev = transit_effect_phase_prev_by_category.get(cat)
             if prev is None or len(prev) != NUM_PARAMETERS:
                 prev = (0.0,) * NUM_PARAMETERS
             daily_cat = daily_by_cat[cat]
-            new_phase = tuple(
-                max(-phase_limit, min(phase_limit, prev[p] * PHASE_DECAY + daily_cat[p] * PHASE_GAIN))
-                for p in range(NUM_PARAMETERS)
-            )
+            new_phase_list = [0.0] * NUM_PARAMETERS
+            for p in range(NUM_PARAMETERS):
+                new_phase_list[p] = max(
+                    -phase_limit,
+                    min(phase_limit, prev[p] * PHASE_DECAY + daily_cat[p] * PHASE_GAIN),
+                )
+            new_phase = tuple(new_phase_list)
             phase_after[cat] = new_phase
             phase_parts.append(new_phase)
-        phase_combined = tuple(
-            phase_parts[0][i] + phase_parts[1][i] + phase_parts[2][i] for i in range(NUM_PARAMETERS)
-        )
-        effective_transit = tuple(
-            PHASE_DAILY_WEIGHT * daily_transit_effect[p] + PHASE_SMOOTH_WEIGHT * phase_combined[p]
-            for p in range(NUM_PARAMETERS)
-        )
+        phase_combined_list = [0.0] * NUM_PARAMETERS
+        for i in range(NUM_PARAMETERS):
+            phase_combined_list[i] = phase_parts[0][i] + phase_parts[1][i] + phase_parts[2][i]
+        phase_combined = tuple(phase_combined_list)
+        effective_transit_list = [0.0] * NUM_PARAMETERS
+        for p in range(NUM_PARAMETERS):
+            effective_transit_list[p] = (
+                PHASE_DAILY_WEIGHT * daily_transit_effect[p]
+                + PHASE_SMOOTH_WEIGHT * phase_combined[p]
+            )
+        effective_transit = tuple(effective_transit_list)
         params_final, axis_final = assemble_state(
             identity.base_vector,
             identity.sensitivity_vector,
@@ -180,11 +191,20 @@ def run_step_v2(
     if transit_effect_history and len(transit_effect_history) > 0:
         window = transit_effect_history[-PHASE_WINDOW_DAYS:]
         n = len(window)
-        phase = tuple(sum(w[p] for w in window) / n for p in range(NUM_PARAMETERS))
-        effective_transit = tuple(
-            PHASE_DAILY_WEIGHT * daily_transit_effect[p] + PHASE_SMOOTH_WEIGHT * phase[p]
-            for p in range(NUM_PARAMETERS)
-        )
+        phase_list = [0.0] * NUM_PARAMETERS
+        for w in window:
+            for p in range(NUM_PARAMETERS):
+                phase_list[p] += w[p]
+        for p in range(NUM_PARAMETERS):
+            phase_list[p] /= n
+        phase = tuple(phase_list)
+        effective_transit_list = [0.0] * NUM_PARAMETERS
+        for p in range(NUM_PARAMETERS):
+            effective_transit_list[p] = (
+                PHASE_DAILY_WEIGHT * daily_transit_effect[p]
+                + PHASE_SMOOTH_WEIGHT * phase_list[p]
+            )
+        effective_transit = tuple(effective_transit_list)
         params_final, axis_final = assemble_state(
             identity.base_vector,
             identity.sensitivity_vector,
@@ -242,8 +262,5 @@ def replay_match(
 
 def replay_output_hash(params_final: tuple[float, ...], axis_final: tuple[float, ...]) -> str:
     """Deterministic hash of params_final + axis_final for replay identity check."""
-    blob = orjson.dumps(
-        [list(params_final), list(axis_final)],
-        option=orjson.OPT_SORT_KEYS,
-    )
+    blob = orjson.dumps((params_final, axis_final), option=orjson.OPT_SORT_KEYS)
     return hashlib.sha256(blob).hexdigest()

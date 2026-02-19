@@ -11,6 +11,7 @@ from typing import Any
 # Optional: fail at import if not installed when astrology is used
 try:
     import swisseph as swe
+    swe.set_ephe_path(None)  # один раз при загрузке — встроенные эфемериды
 except ImportError:
     swe = None  # type: ignore[assignment]
 
@@ -38,7 +39,7 @@ def normalize_birth_datetime_utc(
     minute: int = 0,
     second: float = 0.0,
 ) -> datetime:
-    """Normalize birth time to UTC (no timezone conversion; assume input is already UTC)."""
+    """Собирает дату/время рождения в datetime в UTC. Входные компоненты считаются уже в UTC, конвертация часового пояса не выполняется."""
     return datetime(
         year, month, day, hour, minute, int(second), int((second % 1) * 1_000_000),
         tzinfo=timezone.utc,
@@ -46,7 +47,7 @@ def normalize_birth_datetime_utc(
 
 
 def validate_location(lat: float, lon: float) -> None:
-    """Validate latitude and longitude bounds. Raises ValueError if out of range."""
+    """Проверяет, что широта и долгота в допустимых границах (LAT_MIN..LAT_MAX, LON_MIN..LON_MAX). При выходе за границы выбрасывает ValueError."""
     if not (LAT_MIN <= lat <= LAT_MAX):
         raise ValueError(f"Latitude must be in [{LAT_MIN}, {LAT_MAX}], got {lat}")
     if not (LON_MIN <= lon <= LON_MAX):
@@ -54,7 +55,7 @@ def validate_location(lat: float, lon: float) -> None:
 
 
 def datetime_to_julian_utc(dt: datetime) -> float:
-    """Convert datetime (UTC) to Julian Day UT for Swiss Ephemeris."""
+    """Переводит datetime в юлианский день (UT) для Swiss Ephemeris. Если передан не UTC — предварительно приводит к UTC."""
     if swe is None:
         raise RuntimeError("pyswisseph is not installed; install with pip install hnh[astrology]")
     if dt.tzinfo is not None and dt.tzinfo != timezone.utc:
@@ -66,15 +67,13 @@ def datetime_to_julian_utc(dt: datetime) -> float:
 
 def compute_positions(jd_ut: float) -> list[dict[str, Any]]:
     """
-    Compute ecliptic longitudes for standard planets at given Julian Day UT.
-    Returns list of {"planet": str, "longitude": float} (deterministic order).
+    Считает эклиптические долготы стандартных планет (Sun..Saturn) на заданный юлианский день UT.
+    Возвращает список словарей {"planet": str, "longitude": float} в фиксированном порядке.
     """
     if swe is None:
         raise RuntimeError("pyswisseph is not installed; install with pip install hnh[astrology]")
-    swe.set_ephe_path(None)  # use built-in ephemeris
-    result: list[dict[str, Any]] = []
-    for name, pid in PLANETS_NATAL:
-        xx, _ret = swe.calc_ut(jd_ut, pid)  # (position_tuple, flags)
-        longitude = float(xx[0])  # ecliptic longitude
-        result.append({"planet": name, "longitude": longitude})
+    result: list[dict[str, Any]] = [None] * len(PLANETS_NATAL)  # предварительный размер — без роста списка
+    for i, (name, pid) in enumerate(PLANETS_NATAL):
+        xx, _ = swe.calc_ut(jd_ut, pid)
+        result[i] = {"planet": name, "longitude": float(xx[0])}
     return result

@@ -23,19 +23,22 @@ def build_natal_positions(
     Same input → identical output (reproducible).
     """
     eph.validate_location(latitude, longitude)
-    # Normalize to UTC if needed
     if birth_datetime_utc.tzinfo is None:
-        birth_datetime_utc = birth_datetime_utc.replace(tzinfo=timezone.utc)
-    jd_ut = eph.datetime_to_julian_utc(birth_datetime_utc)
+        dt_utc = birth_datetime_utc.replace(tzinfo=timezone.utc)
+    elif birth_datetime_utc.tzinfo != timezone.utc:
+        dt_utc = birth_datetime_utc.astimezone(timezone.utc)
+    else:
+        dt_utc = birth_datetime_utc
+    jd_ut = eph.datetime_to_julian_utc(dt_utc)
     positions = eph.compute_positions(jd_ut)
-    # Round for stable serialization
-    positions_rounded = [
-        {"planet": p["planet"], "longitude": round(p["longitude"], 6)}
-        for p in positions
-    ]
+    n_pos = len(positions)
+    positions_rounded: list[dict[str, Any]] = [None] * n_pos
+    for i in range(n_pos):
+        p = positions[i]
+        positions_rounded[i] = {"planet": p["planet"], "longitude": round(p["longitude"], 6)}
     aspects_list = asp.detect_aspects(positions, orb_config)
     return {
-        "birth_datetime_utc": birth_datetime_utc.isoformat(),
+        "birth_datetime_utc": dt_utc.isoformat(),
         "latitude": latitude,
         "longitude": longitude,
         "jd_ut": round(jd_ut, 6),

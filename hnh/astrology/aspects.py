@@ -29,7 +29,7 @@ DEFAULT_ORBS: dict[str, float] = {
 
 @dataclass(frozen=True)
 class OrbConfig:
-    """Orb configuration per aspect (explicit, versioned)."""
+    """Конфигурация орбов по мажорным аспектам (явные значения, без магических констант)."""
 
     conjunction: float = 8.0
     opposition: float = 8.0
@@ -38,6 +38,7 @@ class OrbConfig:
     sextile: float = 6.0
 
     def get_orb(self, aspect_name: str) -> float:
+        """Возвращает допустимый орб (в градусах) для аспекта по имени (Conjunction, Opposition и т.д.)."""
         orb_map = {
             "Conjunction": self.conjunction,
             "Opposition": self.opposition,
@@ -47,20 +48,28 @@ class OrbConfig:
         }
         return orb_map.get(aspect_name, 6.0)
 
-
-def _normalize_angle(degrees: float) -> float:
-    """Normalize longitude to [0, 360)."""
-    d = degrees % 360.0
-    return d if d >= 0 else d + 360.0
+    def orbs_tuple(self) -> tuple[float, ...]:
+        """Орбы в порядке MAJOR_ASPECTS (для быстрого доступа по индексу в цикле)."""
+        return (
+            self.conjunction,
+            self.opposition,
+            self.trine,
+            self.square,
+            self.sextile,
+        )
 
 
 def angular_separation(lon1: float, lon2: float) -> float:
-    """Shortest angular separation between two longitudes (0–180)."""
-    a = _normalize_angle(lon1)
-    b = _normalize_angle(lon2)
+    """Кратчайшая угловая дуга между двумя долготами в градусах (результат в диапазоне 0–180)."""
+    a = lon1 % 360.0
+    if a < 0:
+        a += 360.0
+    b = lon2 % 360.0
+    if b < 0:
+        b += 360.0
     diff = abs(a - b)
     if diff > 180.0:
-        diff = 360.0 - diff
+        diff = 360.0 - diff  # берём меньшую дугу по кругу
     return diff
 
 
@@ -69,25 +78,27 @@ def detect_aspects(
     orb_config: OrbConfig | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Detect major aspects between all pairs of positions.
-    Returns list of {"planet1", "planet2", "aspect", "angle", "separation", "within_orb"}.
+    Находит мажорные аспекты между всеми парами позиций (например, натальная карта).
+    Каждая позиция — dict с ключами "planet" и "longitude".
+    Возвращает список словарей: planet1, planet2, aspect, angle, separation, within_orb.
     """
     orb_config = orb_config or OrbConfig()
+    orbs = orb_config.orbs_tuple()  # один раз на весь вызов, доступ по индексу
     aspects_found: list[dict[str, Any]] = []
     for i, p1 in enumerate(positions):
-        for p2 in positions[i + 1 :]:  # noqa: E203
-            lon1 = p1["longitude"]
-            lon2 = p2["longitude"]
-            sep = angular_separation(lon1, lon2)
-            for aspect_name, angle_deg in MAJOR_ASPECTS:
-                orb = orb_config.get_orb(aspect_name)
-                if angle_deg == 0:  # Conjunction
+        lon1 = p1["longitude"]
+        planet1 = p1["planet"]
+        for p2 in positions[i + 1 :]:  # noqa: E203  # только уникальные пары
+            sep = angular_separation(lon1, p2["longitude"])
+            for idx, (aspect_name, angle_deg) in enumerate(MAJOR_ASPECTS):
+                orb = orbs[idx]
+                if angle_deg == 0:  # Соединение: близко к 0° или к 360°
                     within = sep <= orb or (360.0 - sep) <= orb
                 else:
                     within = abs(sep - angle_deg) <= orb
                 if within:
                     aspects_found.append({
-                        "planet1": p1["planet"],
+                        "planet1": planet1,
                         "planet2": p2["planet"],
                         "aspect": aspect_name,
                         "angle": angle_deg,
@@ -103,25 +114,26 @@ def aspects_between(
     orb_config: OrbConfig | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Detect major aspects between two sets of positions (e.g. transit vs natal).
-    Returns list of {"planet1", "planet2", "aspect", "angle", "separation", "within_orb"}.
+    Находит мажорные аспекты между двумя наборами позиций (например, транзиты и натал).
+    Перебирает все пары (p из A, q из B). Формат позиций и результат — как у detect_aspects.
     """
     orb_config = orb_config or OrbConfig()
+    orbs = orb_config.orbs_tuple()
     result: list[dict[str, Any]] = []
     for p1 in positions_a:
+        lon1 = p1["longitude"]
+        planet1 = p1["planet"]
         for p2 in positions_b:
-            lon1 = p1["longitude"]
-            lon2 = p2["longitude"]
-            sep = angular_separation(lon1, lon2)
-            for aspect_name, angle_deg in MAJOR_ASPECTS:
-                orb = orb_config.get_orb(aspect_name)
-                if angle_deg == 0:
+            sep = angular_separation(lon1, p2["longitude"])
+            for idx, (aspect_name, angle_deg) in enumerate(MAJOR_ASPECTS):
+                orb = orbs[idx]
+                if angle_deg == 0:  # Соединение
                     within = sep <= orb or (360.0 - sep) <= orb
                 else:
                     within = abs(sep - angle_deg) <= orb
                 if within:
                     result.append({
-                        "planet1": p1["planet"],
+                        "planet1": planet1,
                         "planet2": p2["planet"],
                         "aspect": aspect_name,
                         "angle": angle_deg,

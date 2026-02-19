@@ -6,7 +6,6 @@ T2.1 Modality weighting, T2.2 Saturn stabilization, T2.3 Uranus disruption, T2.4
 
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import Any
 
 from hnh.identity.schema import (
@@ -15,6 +14,12 @@ from hnh.identity.schema import (
     PARAMETERS,
     _PARAMETER_LIST,
     get_axis_index,
+)
+
+# Предвычисление: ось → индексы параметров (4 на ось), чтобы не перебирать все 32 в цикле по планетам
+_AXIS_TO_PARAM_IX: tuple[tuple[int, ...], ...] = tuple(
+    tuple(p_ix for p_ix, (ax_ix, _) in enumerate(_PARAMETER_LIST) if ax_ix == a)
+    for a in range(8)
 )
 
 # --- Modality (T2.1): sign index 0..11 → cardinal/fixed/mutable ------------------------------
@@ -67,19 +72,23 @@ def _saturn_stabilization_factor(positions: list[dict[str, Any]]) -> float:
     T2.2: Saturn strength reduces sensitivity.
     Return factor in (0, 1]: 1.0 = no Saturn, lower = stronger Saturn (e.g. angular/conjunct).
     """
-    for p in positions:
-        if p.get("planet") == "Saturn":
-            lon = float(p["longitude"])
-            # Simple: Saturn in cardinal signs → stronger stabilization (lower factor)
-            sign_ix = _longitude_to_sign_index(lon)
-            mod_ix = _SIGN_MODALITY[sign_ix]
-            # Cardinal Saturn = more stabilizing
-            if mod_ix == 0:
-                return 0.75
-            if mod_ix == 1:
-                return 0.85
-            return 0.90
-    return 1.0
+    return _saturn_factor_from_map(
+        {p["planet"]: float(p["longitude"]) for p in positions if p.get("planet")}
+    )
+
+
+def _saturn_factor_from_map(positions_by_planet: dict[str, float]) -> float:
+    """T2.2 по словарю планета → долгота (избегаем повторного скана списка)."""
+    lon = positions_by_planet.get("Saturn")
+    if lon is None:
+        return 1.0
+    sign_ix = _longitude_to_sign_index(lon)
+    mod_ix = _SIGN_MODALITY[sign_ix]
+    if mod_ix == 0:
+        return 0.75
+    if mod_ix == 1:
+        return 0.85
+    return 0.90
 
 
 def _uranus_disruption_factor(positions: list[dict[str, Any]]) -> float:
@@ -87,18 +96,23 @@ def _uranus_disruption_factor(positions: list[dict[str, Any]]) -> float:
     T2.3: Uranus strength increases sensitivity.
     Return multiplier >= 1.0; 1.0 = no Uranus or weak.
     """
-    for p in positions:
-        if p.get("planet") == "Uranus":
-            lon = float(p["longitude"])
-            sign_ix = _longitude_to_sign_index(lon)
-            mod_ix = _SIGN_MODALITY[sign_ix]
-            # Fixed sign Uranus (Aquarius) = stronger disruption
-            if mod_ix == 1:
-                return 1.25
-            if mod_ix == 0:
-                return 1.15
-            return 1.10
-    return 1.0
+    return _uranus_factor_from_map(
+        {p["planet"]: float(p["longitude"]) for p in positions if p.get("planet")}
+    )
+
+
+def _uranus_factor_from_map(positions_by_planet: dict[str, float]) -> float:
+    """T2.3 по словарю планета → долгота."""
+    lon = positions_by_planet.get("Uranus")
+    if lon is None:
+        return 1.0
+    sign_ix = _longitude_to_sign_index(lon)
+    mod_ix = _SIGN_MODALITY[sign_ix]
+    if mod_ix == 1:
+        return 1.25
+    if mod_ix == 0:
+        return 1.15
+    return 1.10
 
 
 def _aspect_tension_score(aspects: list[Any]) -> float:
@@ -129,41 +143,40 @@ def compute_sensitivity(natal_data: dict[str, Any]) -> tuple[float, ...]:
     positions = natal_data.get("positions") or []
     aspects = natal_data.get("aspects") or []
 
-    # Baseline per-parameter: 0.5
+    # Один проход: словарь планета → долгота (для Saturn/Uranus и модальности)
+    positions_by_planet = {p["planet"]: float(p["longitude"]) for p in positions if p.get("planet")}
+
     raw = [0.5] * NUM_PARAMETERS
 
-    # Modality: per-planet longitude → weight; add to params of that planet's axis
-    for pos in positions:
-        planet = pos.get("planet")
-        if not planet:
-            continue
-        lon = float(pos["longitude"])
-        weight = _modality_weight_for_longitude(lon)
+    # Modality: только параметры нужной оси (через _AXIS_TO_PARAM_IX)
+    for planet, lon in positions_by_planet.items():
         axis_ix = _PLANET_AXIS.get(planet)
         if axis_ix is None:
             continue
-        for p_ix, (ax_ix, _) in enumerate(_PARAMETER_LIST):
-            if ax_ix == axis_ix:
-                raw[p_ix] += (weight - 0.5) * 0.2  # small delta
+        weight = _modality_weight_for_longitude(lon)
+        delta = (weight - 0.5) * 0.2
+        for p_ix in _AXIS_TO_PARAM_IX[axis_ix]:
+            raw[p_ix] += delta
 
-    # Aspect tension: slight boost to overall level
     tension = _aspect_tension_score(aspects)
+    tension_delta = (tension - 0.5) * 0.1
     for p_ix in range(NUM_PARAMETERS):
-        raw[p_ix] += (tension - 0.5) * 0.1
+        raw[p_ix] += tension_delta
 
-    # Saturn: reduce (stabilization)
-    saturn_f = _saturn_stabilization_factor(positions)
+    # Saturn и Uranus: один общий множитель, один проход по raw
+    combined_f = _saturn_factor_from_map(positions_by_planet) * _uranus_factor_from_map(
+        positions_by_planet
+    )
     for p_ix in range(NUM_PARAMETERS):
-        raw[p_ix] *= saturn_f
+        raw[p_ix] *= combined_f
 
-    # Uranus: increase (disruption)
-    uranus_f = _uranus_disruption_factor(positions)
-    for p_ix in range(NUM_PARAMETERS):
-        raw[p_ix] *= uranus_f
-
-    # T2.4 Normalize to [0, 1] preserving relative differences
-    min_r = min(raw)
-    max_r = max(raw)
+    # T2.4 Нормализация: один проход min/max
+    min_r = max_r = raw[0]
+    for x in raw[1:]:
+        if x < min_r:
+            min_r = x
+        elif x > max_r:
+            max_r = x
     if max_r <= min_r:
         return tuple(0.5 for _ in range(NUM_PARAMETERS))
     scale = 1.0 / (max_r - min_r)
@@ -175,9 +188,24 @@ def sensitivity_histogram(sensitivity_vector: tuple[float, ...]) -> dict[str, An
     Debug: distribution statistics (e.g. histogram) for sensitivity vector.
     Spec: expose in debug mode. Returns counts in buckets and basic stats.
     """
-    buckets = defaultdict(int)
+    if not sensitivity_vector:
+        return {
+            "histogram": {},
+            "low_sensitivity_pct": 0.0,
+            "high_sensitivity_pct": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "mean": 0.0,
+        }
+    buckets: dict[str, int] = {"0.00-0.25": 0, "0.25-0.50": 0, "0.50-0.75": 0, "0.75-1.00": 0}
+    min_v = max_v = sensitivity_vector[0]
+    total = 0.0
     for s in sensitivity_vector:
-        # Buckets: 0-0.25 low, 0.25-0.5, 0.5-0.75, 0.75-1.0 high
+        total += s
+        if s < min_v:
+            min_v = s
+        elif s > max_v:
+            max_v = s
         if s < 0.25:
             buckets["0.00-0.25"] += 1
         elif s < 0.5:
@@ -186,13 +214,14 @@ def sensitivity_histogram(sensitivity_vector: tuple[float, ...]) -> dict[str, An
             buckets["0.50-0.75"] += 1
         else:
             buckets["0.75-1.00"] += 1
+    n = len(sensitivity_vector)
     low_count = buckets["0.00-0.25"] + buckets["0.25-0.50"]
     high_count = buckets["0.50-0.75"] + buckets["0.75-1.00"]
     return {
         "histogram": dict(buckets),
-        "low_sensitivity_pct": round(100.0 * low_count / len(sensitivity_vector), 2),
-        "high_sensitivity_pct": round(100.0 * high_count / len(sensitivity_vector), 2),
-        "min": min(sensitivity_vector),
-        "max": max(sensitivity_vector),
-        "mean": sum(sensitivity_vector) / len(sensitivity_vector),
+        "low_sensitivity_pct": round(100.0 * low_count / n, 2),
+        "high_sensitivity_pct": round(100.0 * high_count / n, 2),
+        "min": min_v,
+        "max": max_v,
+        "mean": total / n,
     }

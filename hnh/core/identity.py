@@ -5,9 +5,10 @@ At most one Core per identity_id; duplicate creation raises.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Any
+
+import orjson
+import xxhash
 
 from pydantic import BaseModel, model_validator
 
@@ -46,14 +47,16 @@ class IdentityCore(BaseModel):
 
     @property
     def identity_hash(self) -> str:
-        """Stable, deterministic hash of identity."""
+        """Стабильный детерминированный хеш идентичности (xxhash xxh3_128, 64 hex-символа)."""
         payload = {
             "identity_id": self.identity_id,
             "base_behavior_vector": self.base_traits.to_dict(),
             "symbolic_input": self.symbolic_input,
         }
-        blob = json.dumps(payload, sort_keys=True)
-        return hashlib.sha256(blob.encode()).hexdigest()
+        blob = orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)
+        h1 = xxhash.xxh3_128(blob, seed=0).hexdigest()
+        h2 = xxhash.xxh3_128(blob, seed=1).hexdigest()
+        return h1 + h2
 
     def __hash__(self) -> int:
         return hash((self.identity_id, self.identity_hash))
