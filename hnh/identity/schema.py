@@ -5,9 +5,10 @@ Canonical ordering, deterministic index mapping. Spec 002.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Any
+
+import orjson
+import xxhash
 
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -208,8 +209,8 @@ class IdentityCore(BaseModel):
             "base_vector": list(self.base_vector),
             "sensitivity_vector": list(self.sensitivity_vector),
         }
-        blob = json.dumps(payload, sort_keys=True)
-        return hashlib.sha256(blob.encode()).hexdigest()
+        blob = orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)
+        return xxhash.xxh3_128(blob, seed=0).hexdigest()
 
     def __hash__(self) -> int:
         return hash((self.identity_id, self.identity_hash))

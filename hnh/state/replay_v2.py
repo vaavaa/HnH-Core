@@ -6,12 +6,12 @@ Same inputs → identical params_final and axis_final (tolerance 1e-9). No syste
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
 import orjson
+import xxhash
 
 from hnh.config.replay_config import ReplayConfig, compute_configuration_hash
 from hnh.identity.schema import IdentityCore, NUM_AXES, NUM_PARAMETERS
@@ -63,11 +63,11 @@ class ReplayResult:
 
 
 def _transit_signature_hash(transit_data: dict[str, Any] | None) -> str:
-    """Deterministic hash of transit signature for replay."""
+    """Deterministic hash of transit signature for replay (xxhash, Spec 003)."""
     if not transit_data:
-        return hashlib.sha256(b"no_transit").hexdigest()
+        return xxhash.xxh3_128(b"no_transit", seed=0).hexdigest()
     blob = orjson.dumps(transit_data, option=orjson.OPT_SORT_KEYS)
-    return hashlib.sha256(blob).hexdigest()
+    return xxhash.xxh3_128(blob, seed=0).hexdigest()
 
 
 def run_step_v2(
@@ -261,6 +261,6 @@ def replay_match(
 
 
 def replay_output_hash(params_final: tuple[float, ...], axis_final: tuple[float, ...]) -> str:
-    """Deterministic hash of params_final + axis_final for replay identity check."""
+    """Deterministic hash of params_final + axis_final for replay identity check (xxhash, Spec 003)."""
     blob = orjson.dumps((params_final, axis_final), option=orjson.OPT_SORT_KEYS)
-    return hashlib.sha256(blob).hexdigest()
+    return xxhash.xxh3_128(blob, seed=0).hexdigest()

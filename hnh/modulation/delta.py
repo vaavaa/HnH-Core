@@ -109,11 +109,15 @@ _DEFAULT_ASPECT_WEIGHTS_32: dict[str, dict[str, float]] = {
 }
 
 
+# Name → index once (avoid repeated list(PARAMETERS).index in loops)
+_PARAM_NAME_TO_INDEX: dict[str, int] = {p: i for i, p in enumerate(PARAMETERS)}
+
+
 def _axis_of_param(param_name: str) -> str | None:
     """Return axis name for parameter, or None if unknown."""
-    if param_name not in PARAMETERS:
+    idx = _PARAM_NAME_TO_INDEX.get(param_name)
+    if idx is None:
         return None
-    idx = list(PARAMETERS).index(param_name)
     axis_ix = get_parameter_axis_index(idx)
     return AXES[axis_ix]
 
@@ -152,7 +156,6 @@ def compute_raw_delta_32(
     """
     weights = aspect_weights or _DEFAULT_ASPECT_WEIGHTS_32
     raw = [0.0] * NUM_PARAMETERS
-    param_list = list(PARAMETERS)
     for asp in aspects_to_natal:
         aspect_name = asp.get("aspect", "")
         if aspect_name not in weights:
@@ -179,12 +182,12 @@ def compute_raw_delta_32(
             OUTER_PLANET_MULTIPLIER.get(planet2, 1.0),
         )
         for param_name, w in weights[aspect_name].items():
-            if param_name not in param_list:
+            idx = _PARAM_NAME_TO_INDEX.get(param_name)
+            if idx is None:
                 continue
             # When aspect has planet1/planet2, only params of those axes get delta
             if affected_axes and _axis_of_param(param_name) not in affected_axes:
                 continue
-            idx = param_list.index(param_name)
             raw[idx] += w * intensity * outer_mul
     return tuple(raw)
 

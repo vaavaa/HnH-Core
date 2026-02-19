@@ -1,13 +1,14 @@
 """
 Replay-relevant config subset and configuration_hash (Spec 002).
-SHA256 of canonical serialization; replay-relevant fields only.
+xxhash of canonical serialization (orjson); replay-relevant fields only. Spec 003.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass
+
+import orjson
+import xxhash
 
 from hnh.identity.schema import AXES, PARAMETERS
 
@@ -46,7 +47,7 @@ class ReplayConfig:
 
 def compute_configuration_hash(config: ReplayConfig) -> str:
     """
-    SHA256 of replay-relevant fields only (canonical JSON).
+    xxhash of replay-relevant fields only (canonical orjson). Spec 003.
     Deterministic; same config → same hash.
     """
     payload = {
@@ -56,8 +57,8 @@ def compute_configuration_hash(config: ReplayConfig) -> str:
         "axis_max_delta": dict(sorted(config.axis_max_delta_dict.items())),
         "parameter_max_delta": dict(sorted(config.parameter_max_delta_dict.items())),
     }
-    blob = json.dumps(payload, sort_keys=True)
-    return hashlib.sha256(blob.encode()).hexdigest()
+    blob = orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)
+    return xxhash.xxh3_128(blob, seed=0).hexdigest()
 
 
 def resolve_max_delta(

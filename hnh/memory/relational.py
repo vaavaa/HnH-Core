@@ -6,9 +6,10 @@ Spec 002: memory_delta_32, memory_signature for replay.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Any
+
+import orjson
+import xxhash
 
 from hnh.memory.update_rules import (
     compute_behavioral_modifier,
@@ -70,8 +71,8 @@ class RelationalMemory:
             "user_id": snap["user_id"],
             "events": snap["events"],
         }
-        blob = json.dumps(payload, sort_keys=True)
-        return hashlib.sha256(blob.encode()).hexdigest()
+        blob = orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)
+        return xxhash.xxh3_128(blob, seed=0).hexdigest()
 
     def snapshot(self) -> dict[str, Any]:
         """

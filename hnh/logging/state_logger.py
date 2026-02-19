@@ -1,22 +1,24 @@
 """
-Structured state transition logger per state-log-spec.
+Structured state transition logger per state-log-spec (001).
 One record per state transition; one JSON line per record; diffable.
+Uses orjson for serialization (Spec 003).
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Any, TextIO
+
+import orjson
+import xxhash
 
 from hnh.logging.contracts import STATE_LOG_REQUIRED_FIELDS
 from hnh.state.dynamic_state import DynamicState
 
 
 def _hash_dict(d: dict[str, Any]) -> str:
-    """Deterministic hash of a dict (sorted keys)."""
-    blob = json.dumps(d, sort_keys=True)
-    return hashlib.sha256(blob.encode()).hexdigest()
+    """Deterministic hash of a dict (sorted keys). Spec 003: xxhash."""
+    blob = orjson.dumps(d, option=orjson.OPT_SORT_KEYS)
+    return xxhash.xxh3_128(blob, seed=0).hexdigest()
 
 
 def build_record(state: DynamicState) -> dict[str, Any]:
@@ -41,7 +43,7 @@ def build_record(state: DynamicState) -> dict[str, Any]:
 
 def emit_line(record: dict[str, Any]) -> str:
     """Serialize record to one JSON line (no trailing newline). JSON Lines = one line per record."""
-    return json.dumps(record, sort_keys=True, ensure_ascii=True)
+    return orjson.dumps(record, option=orjson.OPT_SORT_KEYS).decode("utf-8")
 
 
 def write_record(state: DynamicState, stream: TextIO) -> None:
@@ -56,7 +58,7 @@ def parse_line(line: str) -> dict[str, Any]:
     line = line.strip()
     if not line:
         raise ValueError("Empty log line")
-    return json.loads(line)
+    return orjson.loads(line)
 
 
 def validate_record(record: dict[str, Any]) -> None:

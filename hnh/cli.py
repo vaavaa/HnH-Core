@@ -6,8 +6,9 @@ Time is always injected from CLI args — no datetime.now() in core.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
+
+import orjson
 from datetime import datetime, timezone
 
 from hnh.core.identity import IdentityCore as CoreIdentity001
@@ -66,7 +67,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
             "final_behavioral_vector": state.final_behavior_vector.to_dict(),
             "active_modifiers": state.active_modifiers,
         }
-        print(json.dumps(out, sort_keys=True))
+        print(orjson.dumps(out, option=orjson.OPT_SORT_KEYS).decode("utf-8"))
     else:
         print("final_behavioral_vector:", state.final_behavior_vector.to_dict())
         print("active_modifiers:", state.active_modifiers)
@@ -138,7 +139,7 @@ def _cmd_run_v2(args: argparse.Namespace) -> None:
             keys_001 = ("warmth", "strictness", "verbosity", "correction_rate", "humor_level", "challenge_intensity", "pacing")
             legacy = dict(zip(keys_001, (result.params_final[i] for i in idx_001)))
             out["final_behavioral_vector_legacy"] = legacy
-        print(json.dumps(out, sort_keys=True))
+        print(orjson.dumps(out, option=orjson.OPT_SORT_KEYS).decode("utf-8"))
     else:
         if args.legacy:
             idx_001 = (0, 14, 16, 20, 29, 21, 23)

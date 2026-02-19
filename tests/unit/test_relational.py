@@ -100,14 +100,14 @@ def test_memory_delta_32_deterministic():
 
 
 def test_memory_signature_stable():
-    """T6.3: Same snapshot → same memory_signature."""
+    """T6.3: Same snapshot → same memory_signature. Spec 003: xxhash xxh3_128 → 32 hex chars."""
     mem = RelationalMemory("user-sig")
     mem.add_event(1, "interaction")
     mem.add_event(2, "interaction")
     h1 = mem.memory_signature()
     h2 = mem.memory_signature()
     assert h1 == h2
-    assert len(h1) == 64  # sha256 hex
+    assert len(h1) == 32  # xxh3_128 hex (Spec 003)
 
 
 def test_memory_signature_different_events_different_hash():

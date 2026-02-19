@@ -98,10 +98,9 @@ def compute_memory_delta_32(
         (resp - 0.5) * 0.2,   # 6 power
         (min(n, 10) / 10.0 - 0.5) * 0.2,  # 7 motivation
     ]
-    out: list[float] = []
+    out: list[float] = [0.0] * NUM_PARAMETERS
     for p_ix in range(NUM_PARAMETERS):
         axis_ix = _PARAMETER_LIST[p_ix][0]
         raw = axis_deltas[axis_ix] * cap
-        clamped = max(-cap, min(cap, raw))
-        out.append(round(clamped, 10))
+        out[p_ix] = round(max(-cap, min(cap, raw)), 10)
     return tuple(out)

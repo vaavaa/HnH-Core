@@ -35,12 +35,10 @@ def assemble_state(
         raise ValueError(f"memory_delta length must be {NUM_PARAMETERS}")
     if precomputed_transit_effect is not None and len(precomputed_transit_effect) != NUM_PARAMETERS:
         raise ValueError(f"precomputed_transit_effect length must be {NUM_PARAMETERS}")
+    use_precomputed = precomputed_transit_effect is not None
     params_final = [0.0] * NUM_PARAMETERS
     for p in range(NUM_PARAMETERS):
-        if precomputed_transit_effect is not None:
-            transit = precomputed_transit_effect[p]
-        else:
-            transit = bounded_delta[p] * sensitivity_vector[p]
+        transit = precomputed_transit_effect[p] if use_precomputed else bounded_delta[p] * sensitivity_vector[p]
         params_final[p] = clamp01(base_vector[p] + transit + mem[p])
     # Axis aggregation: ровно 4 параметра на ось
     axis_final = [0.0] * NUM_AXES
