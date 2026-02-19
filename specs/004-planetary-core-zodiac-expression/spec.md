@@ -7,6 +7,18 @@
 
 ---
 
+## Clarifications
+
+### Session 2025-02-19
+
+- Q: Дефолтная система домов — фиксировать в спеке или только в плане? → A: Зафиксировать в спеке дефолт: Placidus; остальные системы — опция конфига.
+- Q: Как вычисляются dominant_sign и dominant_element? → A: dominant_sign — знак с максимальным intensity; dominant_element — элемент (Fire/Earth/Air/Water) с максимальной суммой intensity по своим трём знакам.
+- Q: Знак без планет — как считать Z[sign]? → A: Допускается только вклад правителя и аспектов к нему; если и его нет — вектор (0,0,0,0). Зафиксировать в спеке.
+- Q: Фиксировать ли в спеке привязку входов к четырём измерениям Z? → A: В спеке зафиксировать привязку входов к измерениям (без весов); веса и формулы — в плане/контракте.
+- Q: От чего считается angular strength — только дом или ещё ASC/MC? → A: Только от положения в доме (дома 1,4,7,10 = угловые; шкала в плане). ASC/MC не входят в определение в 004.
+
+---
+
 ## 1. Objective
 
 Extend HnH architecture with a **Zodiac Expression Layer** derived from the 10-planet planetary model.
@@ -53,7 +65,7 @@ The ephemeris layer MUST compute positions for all 10 planets (natal and transit
 
 ### 3.2 Houses
 
-Each planet MUST have a **house position** (1–12). House calculation is **in scope** for 004: the engine MUST compute house cusps from birth (or event) time and location, and assign each planet to a house. House system (e.g. Placidus, Equal, Whole Sign) is configurable; default and supported options MUST be defined in the implementation plan. Angular strength MAY be derived from house position (e.g. angular houses 1, 4, 7, 10).
+Each planet MUST have a **house position** (1–12). House calculation is **in scope** for 004: the engine MUST compute house cusps from birth (or event) time and location, and assign each planet to a house. The **default** house system is **Placidus**; other systems (e.g. Equal, Whole Sign) MAY be selectable via configuration. Angular strength MAY be derived from house position (e.g. angular houses 1, 4, 7, 10).
 
 ### 3.3 Per-Planet Outputs
 
@@ -63,7 +75,7 @@ Each planet provides:
 - House position (1–12)
 - Aspect structure
 - Orb strength
-- Angular strength
+- **Angular strength** — derived from house position only: angular houses (1, 4, 7, 10) are stronger; the exact scale is defined in the implementation plan. ASC/MC are not used in 004.
 - Aspect tension score
 
 All planetary calculations MUST be deterministic.
@@ -104,17 +116,18 @@ Zodiac expression MUST be derived from:
 - Angular weighting
 - Tension vs harmony balance
 
-Example structure:
+**Input-to-dimension mapping** (MUST be defined in the implementation contract; weights and exact formulas are in plan/contract):
 
-```
-Z_intensity(sign) = weighted_sum(
-  planetary_presence,
-  ruler_strength,
-  hard_aspects_weight
-)
-```
+| Dimension      | Inputs that MAY contribute (minimal binding) |
+|----------------|-----------------------------------------------|
+| intensity      | planetary_presence, hard_aspects_weight      |
+| stability      | ruler_strength, tension_vs_harmony balance   |
+| expressiveness | planetary_presence, angular_weighting        |
+| adaptability   | tension_vs_harmony balance                    |
 
 Each dimension MUST be normalized to **[0, 1]**.
+
+**Sign with no planets:** Z[sign] MAY receive contribution from the sign ruler and aspects to that ruler only; if there is no such contribution, Z[sign] = (0, 0, 0, 0). This case MUST be defined so that tests and replay are deterministic.
 
 ---
 
@@ -182,8 +195,8 @@ No stochastic elements allowed.
 
 Lifecycle logs MAY include:
 
-- `dominant_sign`
-- `dominant_element`
+- `dominant_sign` — the sign with **maximum intensity** (among the 4 dimensions of Z[sign]).
+- `dominant_element` — the element (Fire, Earth, Air, Water) whose **sum of intensity** over its three signs is greatest (e.g. Fire = Aries + Leo + Sagittarius).
 - `sign_energy_vector` (12×4)
 - `zodiac_summary_hash`
 
