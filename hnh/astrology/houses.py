@@ -5,11 +5,14 @@ Default system Placidus; angular strength from house only (contract angular-stre
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+_EPHE_PATH = str(Path(__file__).resolve().parent.parent.parent / "ephe")
 
 try:
     import swisseph as swe
-    swe.set_ephe_path(None)
+    swe.set_ephe_path(_EPHE_PATH)
 except ImportError:
     swe = None  # type: ignore[assignment]
 

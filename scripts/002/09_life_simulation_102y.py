@@ -33,8 +33,8 @@ DATE_FIRST = date(1, 12, 25)
 TIME_SLOTS = [(6, 0), (18, 0)]
 
 # Пределы длительности жизни (годы)
-LIFESPAN_MIN = 70
-LIFESPAN_MAX = 108
+LIFESPAN_MIN = 1000
+LIFESPAN_MAX = 2000
 
 
 def _build_natal(birth_date: date) -> dict | None:

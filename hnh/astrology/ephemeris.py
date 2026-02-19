@@ -1,17 +1,22 @@
 """
 Planetary positions via Swiss Ephemeris (pyswisseph).
 All times in UTC; datetime normalization and location validation.
+
+Эфемериды: папка ephe в корне репозитория (файлы .se1 из github.com/aloistr/swisseph).
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
-# Optional: fail at import if not installed when astrology is used
+# Путь к папке ephe в корне репозитория (жёстко)
+_EPHE_PATH = str(Path(__file__).resolve().parent.parent.parent / "ephe")
+
 try:
     import swisseph as swe
-    swe.set_ephe_path(None)  # один раз при загрузке — встроенные эфемериды
+    swe.set_ephe_path(_EPHE_PATH)
 except ImportError:
     swe = None  # type: ignore[assignment]
 
