@@ -180,7 +180,15 @@ def compute_sensitivity(natal_data: dict[str, Any]) -> tuple[float, ...]:
     if max_r <= min_r:
         return tuple(0.5 for _ in range(NUM_PARAMETERS))
     scale = 1.0 / (max_r - min_r)
-    return tuple((x - min_r) * scale for x in raw)
+    result = tuple((x - min_r) * scale for x in raw)
+    # Нижний порог чувствительности для ~40% параметров — меньше "тихих" осей (детерминированно)
+    SENSITIVITY_FLOOR = 0.53
+    _FLOOR_INDICES = (0, 3, 5, 8, 10, 13, 15, 18, 20, 23, 25, 28, 30)  # 13 из 32
+    result_list = list(result)
+    for i in _FLOOR_INDICES:
+        if result_list[i] < SENSITIVITY_FLOOR:
+            result_list[i] = SENSITIVITY_FLOOR
+    return tuple(result_list)
 
 
 def sensitivity_histogram(sensitivity_vector: tuple[float, ...]) -> dict[str, Any]:

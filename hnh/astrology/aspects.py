@@ -17,13 +17,13 @@ MAJOR_ASPECTS = [
     ("Sextile", 60.0),
 ]
 
-# Default orbs (degrees) per aspect - can be overridden by config
+# Default orbs (degrees) per aspect — слегка расширены, чтобы больше аспектов давали вклад (меньше "тихих" осей)
 DEFAULT_ORBS: dict[str, float] = {
-    "Conjunction": 8.0,
-    "Opposition": 8.0,
-    "Trine": 8.0,
-    "Square": 7.0,
-    "Sextile": 6.0,
+    "Conjunction": 9.0,
+    "Opposition": 9.0,
+    "Trine": 9.0,
+    "Square": 8.0,
+    "Sextile": 7.0,
 }
 
 
@@ -31,11 +31,11 @@ DEFAULT_ORBS: dict[str, float] = {
 class OrbConfig:
     """Конфигурация орбов по мажорным аспектам (явные значения, без магических констант)."""
 
-    conjunction: float = 8.0
-    opposition: float = 8.0
-    trine: float = 8.0
-    square: float = 7.0
-    sextile: float = 6.0
+    conjunction: float = 9.0
+    opposition: float = 9.0
+    trine: float = 9.0
+    square: float = 8.0
+    sextile: float = 7.0
 
     def get_orb(self, aspect_name: str) -> float:
         """Возвращает допустимый орб (в градусах) для аспекта по имени (Conjunction, Opposition и т.д.)."""

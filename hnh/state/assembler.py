@@ -2,12 +2,16 @@
 State assembly for 32-parameter model (Spec 002).
 final[p] = clamp01(base[p] + transit_effect[p] + memory_delta[p]).
 Default transit_effect = bounded_delta[p] × sensitivity[p]; optional precomputed (e.g. 0.7*daily + 0.3*phase).
+Noise floor: минимальный по модулю вклад транзита (детерминированный), чтобы оси не были нулевыми.
 Axis aggregation: axis_final = mean(final sub-parameters). Deterministic.
 """
 
 from __future__ import annotations
 
 from hnh.identity.schema import NUM_PARAMETERS, NUM_AXES, _PARAMETER_LIST
+
+# Минимальный по модулю вклад транзита (0.0003–0.0007); детерминированный знак по индексу параметра
+NOISE_FLOOR = 0.0005
 
 
 def clamp01(x: float) -> float:
@@ -38,7 +42,12 @@ def assemble_state(
     use_precomputed = precomputed_transit_effect is not None
     params_final = [0.0] * NUM_PARAMETERS
     for p in range(NUM_PARAMETERS):
-        transit = precomputed_transit_effect[p] if use_precomputed else bounded_delta[p] * sensitivity_vector[p]
+        if use_precomputed:
+            transit = precomputed_transit_effect[p]
+        else:
+            transit = bounded_delta[p] * sensitivity_vector[p]
+            if abs(transit) < NOISE_FLOOR:
+                transit = NOISE_FLOOR if (p % 2 == 0) else -NOISE_FLOOR
         params_final[p] = clamp01(base_vector[p] + transit + mem[p])
     # Axis aggregation: ровно 4 параметра на ось
     axis_final = [0.0] * NUM_AXES
