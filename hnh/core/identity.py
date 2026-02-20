@@ -47,16 +47,14 @@ class IdentityCore(BaseModel):
 
     @property
     def identity_hash(self) -> str:
-        """Стабильный детерминированный хеш идентичности (xxhash xxh3_128, 64 hex-символа)."""
+        """Стабильный детерминированный хеш идентичности (xxhash xxh3_128, seed=0)."""
         payload = {
             "identity_id": self.identity_id,
             "base_behavior_vector": self.base_traits.to_dict(),
             "symbolic_input": self.symbolic_input,
         }
         blob = orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)
-        h1 = xxhash.xxh3_128(blob, seed=0).hexdigest()
-        h2 = xxhash.xxh3_128(blob, seed=1).hexdigest()
-        return h1 + h2
+        return xxhash.xxh3_128(blob, seed=0).hexdigest()
 
     def __hash__(self) -> int:
         return hash((self.identity_id, self.identity_hash))
