@@ -258,3 +258,93 @@ def check_init_death_or_transcendence(
     if w0 >= w_transcend:
         return LifecycleState.TRANSCENDED
     return None
+
+
+# --- Spec 006: LifecycleEngine facade (composition only; not inside BehavioralCore) ---
+
+
+class LifecycleEngine:
+    """
+    Facade over lifecycle state: F, W, state (ALIVE | DISABLED | TRANSCENDED).
+    update_lifecycle(stress, resilience) delegates to fatigue/load/recovery; does not mutate BehavioralCore.
+    """
+
+    __slots__ = ("_state", "_constants")
+
+    def __init__(
+        self,
+        initial_f: float = 0.0,
+        initial_w: float = 0.0,
+        constants: LifecycleConstants | None = None,
+    ) -> None:
+        c = constants or DEFAULT_LIFECYCLE_CONSTANTS
+        L = fatigue_limit(0.5, 0.5, c)  # placeholder r, s_g for init check
+        initial_state = check_init_death_or_transcendence(initial_f, initial_w, L, c.w_transcend)
+        self._state = LifecycleStepState(
+            F=initial_f,
+            W=initial_w,
+            state=initial_state or LifecycleState.ALIVE,
+            sum_v=0.0,
+            sum_burn=0.0,
+            count_days=0,
+        )
+        self._constants = c
+
+    @property
+    def F(self) -> float:
+        return self._state.F
+
+    @property
+    def W(self) -> float:
+        return self._state.W
+
+    @property
+    def state(self) -> LifecycleState:
+        return self._state.state
+
+    def update_lifecycle(
+        self,
+        stress: float,
+        resilience: float,
+        s_g: float = 0.5,
+    ) -> None:
+        """
+        Update F, W, state from stress (S_T) and resilience (R from behavior.current_vector).
+        Does not touch BehavioralCore. Same logic as lifecycle_step for state transitions.
+        """
+        if self._state.state != LifecycleState.ALIVE:
+            return
+        c = self._constants
+        L = fatigue_limit(resilience, s_g, c)
+        q = normalized_fatigue(self._state.F, L)
+
+        # Death: F >= L
+        if self._state.F >= L:
+            delta_w = c.eta_w * (self._state.sum_v / max(1, self._state.count_days)) - c.xi_w * (
+                self._state.sum_burn / max(1, self._state.count_days)
+            )
+            delta_w = max(c.delta_w_min, min(c.delta_w_max, delta_w))
+            w_new = max(0.0, min(1.0, self._state.W + delta_w))
+            self._state.F = self._state.F
+            self._state.W = w_new
+            self._state.state = LifecycleState.DISABLED
+            return
+
+        # Transcendence
+        if self._state.W >= c.w_transcend:
+            self._state.state = LifecycleState.TRANSCENDED
+            return
+
+        # Normal step
+        load_val = load(stress, resilience, s_g, c)
+        rec_val = recovery(stress, resilience, c)
+        f_new = update_fatigue(self._state.F, load_val, rec_val, c)
+        q_new = normalized_fatigue(f_new, L)
+        a_g = activity_factor(q_new, c)
+        v_t = a_g * stress
+        burn_t = max(0.0, q_new - c.q_crit)
+
+        self._state.F = f_new
+        self._state.sum_v += v_t
+        self._state.sum_burn += burn_t
+        self._state.count_days += 1

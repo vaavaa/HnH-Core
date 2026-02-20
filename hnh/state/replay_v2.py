@@ -70,6 +70,47 @@ def _transit_signature_hash(transit_data: dict[str, Any] | None) -> str:
     return xxhash.xxh3_128(blob, seed=0).hexdigest()
 
 
+def _run_step_v2_via_agent(
+    identity: IdentityCore,
+    config: ReplayConfig,
+    dt_utc: datetime,
+    injected_iso: str,
+    config_hash: str,
+    memory_signature: str,
+    natal_positions: dict[str, Any],
+) -> ReplayResult:
+    """Delegate to Agent.step() (Spec 006); build ReplayResult from agent state."""
+    from hnh.agent import Agent
+    from hnh.lifecycle.engine import aggregate_axis
+
+    birth_data = {"positions": natal_positions.get("positions", []), "aspects": natal_positions.get("aspects", [])}
+    agent = Agent(birth_data, config=config, lifecycle=False, identity_config=identity)
+    agent.step(dt_utc)
+    params_final = agent.behavior.current_vector
+    axis_final = aggregate_axis(params_final)
+    transit_state = agent.transits.state(dt_utc, config)
+    shock_active = max(abs(r) for r in transit_state.raw_delta) > config.shock_threshold
+    _, effective_max_delta = apply_bounds(transit_state.raw_delta, config, shock_active)
+    transit_data = tr.compute_transit_signature(dt_utc, natal_positions) if tr is not None else None
+    daily_transit_effect = tuple(
+        transit_state.bounded_delta[p] * identity.sensitivity_vector[p] for p in range(NUM_PARAMETERS)
+    )
+    return ReplayResult(
+        params_final=params_final,
+        axis_final=axis_final,
+        identity_hash=identity.identity_hash,
+        configuration_hash=config_hash,
+        injected_time_utc=injected_iso,
+        transit_signature=_transit_signature_hash(transit_data),
+        shock_flag=shock_active,
+        effective_max_delta=effective_max_delta,
+        memory_signature=memory_signature,
+        daily_transit_effect=daily_transit_effect,
+        daily_transit_effect_by_category=None,
+        phase_by_category_after=None,
+    )
+
+
 def run_step_v2(
     identity: IdentityCore,
     config: ReplayConfig,
@@ -82,6 +123,7 @@ def run_step_v2(
 ) -> ReplayResult:
     """
     Run one deterministic state step (v0.2 pipeline).
+    Delegates to Agent.step() when no phase/history and no memory_delta (Spec 006).
     Optional transit_effect_history: single buffer, window PHASE_WINDOW_DAYS (backward compat, mean).
     Optional transit_effect_phase_prev_by_category: previous phase state per category for exponential
     accumulation: phase[t] = clamp(phase[t-1]*decay + daily[t]*phase_gain, -phase_limit, +phase_limit),
@@ -99,6 +141,18 @@ def run_step_v2(
     memory_delta = memory_delta if memory_delta is not None else (0.0,) * NUM_PARAMETERS
     if len(memory_delta) != NUM_PARAMETERS:
         raise ValueError(f"memory_delta must have length {NUM_PARAMETERS}, got {len(memory_delta)}")
+
+    # Delegate to Agent.step() when simple path (no phase, no history, no memory delta)
+    use_agent = (
+        transit_effect_phase_prev_by_category is None
+        and (not transit_effect_history or len(transit_effect_history) == 0)
+        and all(x == 0.0 for x in memory_delta)
+        and natal_positions is not None
+    )
+    if use_agent:
+        return _run_step_v2_via_agent(
+            identity, config, dt_utc, injected_iso, config_hash, memory_signature, natal_positions
+        )
 
     transit_data: dict[str, Any] | None = None
     raw_delta_list = [0.0] * NUM_PARAMETERS

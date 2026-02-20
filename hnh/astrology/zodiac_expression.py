@@ -213,3 +213,55 @@ def _sign_index_to_name(sign_ix: int) -> str:
         "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
     )
     return names[sign_ix] if 0 <= sign_ix <= 11 else ""
+
+
+# --- Spec 006: ZodiacExpression class (read-only view over NatalChart) ---
+
+
+class ZodiacExpression:
+    """
+    Read-only view over NatalChart: sign_vectors, dominant_sign, dominant_element (Spec 004/006).
+    Does not mutate natal; built from natal.to_natal_data().
+    """
+
+    __slots__ = ("_sign_energy_vector", "_dominant_sign", "_dominant_element", "_dominant_sign_name", "_dominant_sign_element")
+
+    def __init__(self, natal: Any) -> None:
+        """Build from NatalChart (or any object with to_natal_data() returning positions + aspects)."""
+        if hasattr(natal, "to_natal_data"):
+            data = natal.to_natal_data()
+        else:
+            data = natal if isinstance(natal, dict) else {}
+        positions = data.get("positions", [])
+        aspects = data.get("aspects", [])
+        out = compute_zodiac_output(positions, aspects)
+        self._sign_energy_vector: tuple[tuple[float, float, float, float], ...] = tuple(
+            tuple(x) for x in out["sign_energy_vector"]
+        )
+        self._dominant_sign: int = out["dominant_sign"]
+        self._dominant_element: str = out["dominant_element"]
+        self._dominant_sign_name: str = out.get("dominant_sign_name", _sign_index_to_name(out["dominant_sign"]))
+        self._dominant_sign_element: str = out.get("dominant_sign_element", SIGN_TO_ELEMENT[out["dominant_sign"]] if 0 <= out["dominant_sign"] <= 11 else "")
+
+    @property
+    def sign_vectors(self) -> tuple[tuple[float, float, float, float], ...]:
+        """12 signs × 4 dimensions (intensity, stability, expressiveness, adaptability)."""
+        return self._sign_energy_vector
+
+    @property
+    def dominant_sign(self) -> int:
+        """Sign index 0..11 with maximum intensity."""
+        return self._dominant_sign
+
+    @property
+    def dominant_element(self) -> str:
+        """Element (Fire, Earth, Air, Water) with max sum of intensity over its 3 signs."""
+        return self._dominant_element
+
+    def dominant_sign_name(self) -> str:
+        """Human-readable sign name (Aries..Pisces)."""
+        return self._dominant_sign_name
+
+    def dominant_sign_element(self) -> str:
+        """Element of the dominant sign (e.g. Scorpio → Water)."""
+        return self._dominant_sign_element
