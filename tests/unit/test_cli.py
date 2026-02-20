@@ -72,3 +72,27 @@ def test_cli_invalid_date_exits_nonzero() -> None:
             with patch("sys.stderr", StringIO()):
                 main()
             mock_exit.assert_called_once_with(1)
+
+
+def test_cli_agent_step_output_shape(capsys: pytest.CaptureFixture[str]) -> None:
+    """CLI agent step prints params_final (32) and axis_final (8)."""
+    with patch("sys.argv", ["hnh", "agent", "step", "--date", "2024-06-15"]):
+        main()
+    out = capsys.readouterr().out
+    assert "params_final (32):" in out
+    assert "axis_final (8):" in out
+
+
+def test_cli_agent_step_json_with_lifecycle(capsys: pytest.CaptureFixture[str]) -> None:
+    """CLI agent step --lifecycle --json outputs valid JSON with lifecycle fields."""
+    with patch("sys.argv", ["hnh", "agent", "step", "--date", "2024-06-15", "--lifecycle", "--json"]):
+        main()
+    out = capsys.readouterr().out.strip()
+    data = json.loads(out)
+    assert "params_final" in data
+    assert "axis_final" in data
+    assert "lifecycle_F" in data
+    assert "lifecycle_W" in data
+    assert "lifecycle_state" in data
+    assert len(data["params_final"]) == 32
+    assert len(data["axis_final"]) == 8

@@ -6,9 +6,9 @@
 
 ## Что это такое
 
-**HnH** — детерминированный движок «личности»: по заданной дате и сиду он выдаёт **поведенческий вектор** и **активные модификаторы**. В этой ветке (спека 002) используется **иерархическая модель 8×4**: **32 параметра** (8 осей по 4 подпараметра), все значения от 0 до 1, плюс агрегаты по осям (`axis_final`). Всё воспроизводимо: одни и те же входы дают один и тот же результат. В ядре нет обращения к системному времени и случайности без явного seed.
+**HnH** — детерминированный движок «личности»: по заданной дате он выдаёт **поведенческий вектор** (32 параметра, 8 осей) и при необходимости — состояние **lifecycle** (F, W, state). Используется **слоёная архитектура** (спека 006): натал, поведение 32D, транзиты, опционально lifecycle. **Канонический путь** — один шаг через **Agent.step(date)**. Всё воспроизводимо; в ядре нет обращения к системному времени.
 
-Через **CLI** (режим 001) или скрипты в **`scripts/002/`** вы запускаете симуляцию на одну дату и смотрите результат в консоли или в виде одной строки JSON.
+Через **CLI** вы запускаете симуляцию на одну дату: команда **`hnh agent step`** (006) — основной способ; **`run-v2`** (002) и **`run`** (001) сохранены для совместимости. Скрипты в **`scripts/006/`** и **`scripts/002/`** показывают использование Agent и replay.
 
 ---
 
@@ -44,25 +44,35 @@ pip install -e ".[astrology]"
 
 ### Обязательный аргумент: дата
 
-Дата задаётся в формате **YYYY-MM-DD**. Она считается «впрыснутой»: движок не смотрит на системные часы.
+Дата задаётся в формате **YYYY-MM-DD** (UTC noon). Она «впрыскивается»: движок не смотрит на системные часы.
 
-Команды: **`run`** (модель 001, 7 параметров), **`run-v2`** (модель 002, 32 параметра). Справка: `hnh --help`, `hnh run --help`, `hnh run-v2 --help`.
+**Команды:** **`hnh agent step`** (006 — канонический путь, 32 параметра), **`hnh run-v2`** (002), **`hnh run`** (001). Справка: `hnh --help`, `hnh agent step --help`.
+
+### Каноническая команда 006: agent step
+
+Один шаг через **Agent.step(date)** — слои натал, поведение, транзиты (и при `--lifecycle` — lifecycle).
 
 ```bash
-hnh run --date 2024-06-15
+hnh agent step --date 2024-06-15
 ```
 
-**Пример вывода (команда run, режим 001 — 7 параметров):**
+**Пример вывода:**
 
 ```
-final_behavioral_vector: {'warmth': 0.5, 'strictness': 0.4, 'verbosity': 0.6, 'correction_rate': 0.3, 'humor_level': 0.5, 'challenge_intensity': 0.4, 'pacing': 0.5}
-active_modifiers: {'transit_delta': {'warmth': 0.0, 'strictness': 0.0, ...}, ...}
+params_final (32): [0.58, 0.51, ...]
+axis_final (8): [0.53, 0.5, ...]
 ```
 
-Для вывода **32 параметров** (params_final, axis_final): команда **`hnh run-v2 --date YYYY-MM-DD`** или скрипты в `scripts/002/`.
+С **research-режимом** (lifecycle: усталость F, воля W, состояние ALIVE/DISABLED/TRANSCENDED):
 
-- **final_behavioral_vector** (режим 001) — семь параметров; в модели 002 вывод — **params_final** (32) и **axis_final** (8), все в диапазоне 0.0–1.0.
-- **active_modifiers** — чем «подправлен» базовый вектор (transit_delta, relational и т.д.).
+```bash
+hnh agent step --date 2024-06-15 --lifecycle
+```
+
+Дополнительно выводятся: `lifecycle F: ... W: ... state: ...`
+
+- **params_final** (32) и **axis_final** (8) — поведенческий вектор и агрегаты по осям, все значения 0.0–1.0.
+- **run-v2** делегирует в Agent при простом пути (без phase/history); **run** — модель 001 (7 параметров).
 
 ---
 
@@ -71,14 +81,16 @@ active_modifiers: {'transit_delta': {'warmth': 0.0, 'strictness': 0.0, ...}, ...
 Удобно для скриптов и логов:
 
 ```bash
-hnh run --date 2024-01-10 --json
+hnh agent step --date 2024-01-10 --json
 ```
 
-Пример:
+Пример (без lifecycle):
 
 ```json
-{"active_modifiers": {...}, "final_behavioral_vector": {...}, "identity_hash": "...", "injected_time": "2024-01-10T12:00:00+00:00"}
+{"axis_final": [...], "injected_time_utc": "2024-01-10T12:00:00+00:00", "params_final": [...]}
 ```
+
+С `--lifecycle` в JSON добавляются поля `lifecycle_F`, `lifecycle_W`, `lifecycle_state`.
 
 ---
 
@@ -96,28 +108,19 @@ hnh run --date 2024-03-20 --seed 42
 
 ### Проверка воспроизводимости (replay)
 
-Флаг **--replay** запускает расчёт дважды с теми же параметрами и проверяет, что вывод совпадает:
+Флаг **--replay** запускает расчёт дважды с теми же параметрами и проверяет совпадение вывода:
 
 ```bash
-hnh run --date 2024-05-01 --replay
+hnh agent step --date 2024-05-01 --replay
 ```
 
-Если всё ок, вы увидите: `Replay OK: identical output.`  
-Если вывод различается, команда завершится с ошибкой (код выхода 1).
-
-С JSON:
-
-```bash
-hnh run --date 2024-05-01 --replay --json
-```
-
-При успехе выведется та же одна строка JSON (дважды не печатается, только проверка).
+При успехе: `Replay OK: identical output.` При расхождении — код выхода 1.
 
 ---
 
-## 32 параметра (8 осей × 4) — модель 002
+## Слои 006 и модель 32 параметра
 
-В этой ветке основная модель — **иерархическая 8×4**: 8 осей, у каждой по 4 подпараметра (всего 32), значения от **0.0** до **1.0**.
+В архитектуре **006** один шаг выполняется через **Agent**: натал (NatalChart) → поведение (BehavioralCore, 32D) → транзиты (TransitEngine) → опционально lifecycle (LifecycleEngine). Команда **`hnh agent step`** вызывает ровно это. Модель поведения — **иерархическая 8×4**: 8 осей, по 4 подпараметра (всего 32), значения **0.0–1.0**.
 
 | Ось | Подпараметры |
 |-----|----------------|
@@ -139,20 +142,23 @@ hnh run --date 2024-05-01 --replay --json
 ## Примеры команд
 
 ```bash
-# Симуляция на 15 июня 2024, вывод в консоль
+# Канонический шаг 006 (рекомендуется)
+hnh agent step --date 2024-06-15
+
+# С lifecycle (research) и вывод в JSON
+hnh agent step --date 2024-06-15 --lifecycle --json
+
+# Проверка воспроизводимости
+hnh agent step --date 2024-06-15 --replay
+
+# Режим 002 (run-v2 делегирует в Agent при простом пути)
+hnh run-v2 --date 2024-06-15
+
+# Режим 001 (7 параметров)
 hnh run --date 2024-06-15
 
-# То же, но одна строка JSON
-hnh run --date 2024-06-15 --json
-
-# Другой seed
-hnh run --date 2024-06-15 --seed 123
-
-# Проверить, что два прогона дают одинаковый результат
-hnh run --date 2024-06-15 --replay
-
-# Неверная дата — ошибка и подсказка
-hnh run --date 2024-13-01
+# Неверная дата — ошибка
+hnh agent step --date 2024-13-01
 # Invalid --date: ... Use YYYY-MM-DD.
 ```
 
@@ -205,46 +211,52 @@ python scripts/002/08_full_step_v2.py --date 2025-03-01 --log
 
 Подробнее — в [scripts/002/README.md](scripts/002/README.md) и в [specs/002-hierarchical-personality-model/](specs/002-hierarchical-personality-model/).
 
+### Скрипты 006 — Agent и слои
+
+В **`scripts/006/`** — демо слоёной архитектуры: построение Agent (product и research), вызов `step()` по датам, сравнение с replay_v2.
+
+```bash
+python scripts/006/run_agent_demo.py
+```
+
+См. [scripts/006/README.md](scripts/006/README.md).
+
 ---
 
 ## Использование как библиотеки
 
-CLI — обёртка над движком. Из Python можно:
+**Канонический путь (006)** — **Agent.step(date)**. CLI команда `hnh agent step` вызывает именно его.
 
-- создавать **Identity Core** (v0.2: 32 параметра — `hnh.identity.IdentityCore` с `base_vector`, `sensitivity_vector`);
-- вызывать **run_step_v2(identity, config, injected_time, memory_delta=..., memory_signature=...)** и получать **ReplayResult** (params_final, axis_final и подпись replay);
-- писать логи v2 через **state_logger_v2** (orjson);
-- использовать **Planetary Teacher** и **LLM-адаптер** (см. `hnh.interface`).
+Из Python:
 
-Пример минимального шага по модели 002 (32 параметра):
+- **Agent** — единственная точка оркестрации шага: натал, поведение 32D, транзиты, опционально lifecycle (`hnh.agent.Agent`);
+- **run_step_v2** при простом пути делегирует в Agent.step(); для phase/history и memory_delta используется прежняя реализация;
+- логи v2 — **state_logger_v2** (orjson); **Planetary Teacher** и **LLM-адаптер** — `hnh.interface`.
+
+Минимальный пример (006):
 
 ```python
-from datetime import datetime, timezone
-from hnh.identity import IdentityCore
+from datetime import date
+from hnh.agent import Agent
 from hnh.config.replay_config import ReplayConfig
-from hnh.state.replay_v2 import run_step_v2
 
-identity = IdentityCore(
-    identity_id="my-id",
-    base_vector=(0.5,) * 32,
-    sensitivity_vector=(0.5,) * 32,
-)
-config = ReplayConfig(global_max_delta=0.15, shock_threshold=0.8, shock_multiplier=1.5)
-result = run_step_v2(identity, config, datetime(2025, 2, 18, 12, 0, 0, tzinfo=timezone.utc))
-print("params_final (32):", result.params_final[:8], "...")
-print("axis_final (8):", result.axis_final)
+birth_data = {"positions": [{"planet": "Sun", "longitude": 90.0}, {"planet": "Moon", "longitude": 120.0}]}
+config = ReplayConfig(global_max_delta=0.08, shock_threshold=0.5, shock_multiplier=1.0)
+agent = Agent(birth_data, config=config, lifecycle=False)
+agent.step(date(2025, 2, 18))
+print("params_final (32):", agent.behavior.current_vector[:8], "...")
+# axis_final = aggregate_axis(agent.behavior.current_vector); TransitState = agent.transits.state(d, config)
 ```
 
-Подробнее — в `scripts/002/` и в `specs/002-hierarchical-personality-model/`. Режим 001 (7 параметров): `hnh.core.identity`, `hnh.state.replay.run_step`.
+С lifecycle (research): `Agent(..., lifecycle=True)`; после шага доступны `agent.lifecycle.F`, `agent.lifecycle.W`, `agent.lifecycle.state`. Подробнее — в **`scripts/006/`** и **`specs/006-layered-agent-architecture/`**.
 
 ---
 
 ## Дополнительно
 
 - **English version of this guide:** [en-user-guide-readme.md](en-user-guide-readme.md)
-- **Полное описание проекта и идеи:** [README.md](README.md)
-- **Спека и план движка (001):** [specs/001-deterministic-personality-engine/](specs/001-deterministic-personality-engine/)
+- **Полное описание проекта:** [README.md](README.md)
+- **Спека 006 (слоёная архитектура, Agent):** [specs/006-layered-agent-architecture/](specs/006-layered-agent-architecture/)
 - **Спека 002 (8×4 модель):** [specs/002-hierarchical-personality-model/](specs/002-hierarchical-personality-model/)
+- **Скрипты 006:** [scripts/006/README.md](scripts/006/README.md)
 - **Контракт лога переходов:** [specs/001-deterministic-personality-engine/contracts/state-log-spec.md](specs/001-deterministic-personality-engine/contracts/state-log-spec.md)
-
-Если что-то из CLI непонятно или хочется расширить сценарии (например, свой identity из файла, запись лога в файл) — можно описать это в отдельном тикете или в новой спеку.

@@ -1,5 +1,6 @@
 """
-CLI: subcommands for simulating agent state; run (001, 7 params), run-v2 (002, 32 params).
+CLI: subcommands for simulating agent state.
+run (001, 7 params), run-v2 (002, 32 params), agent step (006 — canonical Agent.step()).
 Time is always injected from CLI args — no datetime.now() in core.
 """
 
@@ -83,6 +84,70 @@ def _default_natal_positions_for_transits() -> dict | None:
         return None
 
 
+def _default_birth_data_for_agent() -> dict:
+    """Default birth_data for CLI agent step (006). Positions + aspects; minimal if ephemeris unavailable."""
+    try:
+        from hnh.core.natal import build_natal_positions
+        birth = datetime(2000, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        raw = build_natal_positions(birth, 0.0, 0.0)
+        return {"positions": raw["positions"], "aspects": raw.get("aspects", [])}
+    except Exception:
+        return {
+            "positions": [
+                {"planet": "Sun", "longitude": 0.0},
+                {"planet": "Moon", "longitude": 30.0},
+            ],
+        }
+
+
+def _cmd_agent_step(args: argparse.Namespace) -> None:
+    """Execute agent step (006): Agent.step(date) — canonical orchestration."""
+    try:
+        injected = _parse_date(args.date)
+    except ValueError as e:
+        print(f"Invalid --date: {e}. Use YYYY-MM-DD.", file=sys.stderr)
+        sys.exit(1)
+        return
+
+    from hnh.agent import Agent
+    from hnh.config.replay_config import ReplayConfig
+    from hnh.lifecycle.engine import aggregate_axis
+
+    birth_data = _default_birth_data_for_agent()
+    config = ReplayConfig(global_max_delta=0.08, shock_threshold=0.5, shock_multiplier=1.0)
+    agent = Agent(birth_data, config=config, lifecycle=args.lifecycle)
+    agent.step(injected)
+
+    if args.replay:
+        agent2 = Agent(birth_data, config=config, lifecycle=args.lifecycle)
+        agent2.step(injected)
+        if agent.behavior.current_vector != agent2.behavior.current_vector:
+            print("Replay mismatch: outputs differ.", file=sys.stderr)
+            sys.exit(1)
+        if not args.json:
+            print("Replay OK: identical output.")
+
+    params_final = agent.behavior.current_vector
+    axis_final = aggregate_axis(params_final)
+
+    if args.json:
+        out = {
+            "injected_time_utc": injected.isoformat(),
+            "params_final": list(params_final),
+            "axis_final": list(axis_final),
+        }
+        if args.lifecycle and agent.lifecycle is not None:
+            out["lifecycle_F"] = agent.lifecycle.F
+            out["lifecycle_W"] = agent.lifecycle.W
+            out["lifecycle_state"] = agent.lifecycle.state.value
+        print(orjson.dumps(out, option=orjson.OPT_SORT_KEYS).decode("utf-8"))
+    else:
+        print("params_final (32):", list(params_final))
+        print("axis_final (8):", list(axis_final))
+        if args.lifecycle and agent.lifecycle is not None:
+            print("lifecycle F:", agent.lifecycle.F, "W:", agent.lifecycle.W, "state:", agent.lifecycle.state.value)
+
+
 def _cmd_run_v2(args: argparse.Namespace) -> None:
     """Execute run-v2: one step 002 (32 parameters, 8 axes)."""
     try:
@@ -157,7 +222,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         prog="hnh",
         description="HnH — детерминированный движок личности. Симуляция на заданную дату (время только из аргументов).",
-        epilog="Команды: run (модель 001, 7 параметров), run-v2 (модель 002, 32 параметра, 8 осей).",
+        epilog="Команды: run (001), run-v2 (002), agent step (006 — канонический Agent.step()).",
     )
     subparsers = parser.add_subparsers(dest="command", metavar="COMMAND", required=True)
 
@@ -217,6 +282,42 @@ def main() -> None:
         help="Дополнительно вывести 7 параметров в формате 001 (для совместимости).",
     )
     run_v2_parser.set_defaults(func=_cmd_run_v2)
+
+    # ----- agent step (006) -----
+    agent_parser = subparsers.add_parser(
+        "agent",
+        help="Канонический путь 006: Agent.step(date).",
+        description="Слоёная архитектура 006: один шаг через Agent (natal + behavior + transits [+ lifecycle]).",
+    )
+    agent_sub = agent_parser.add_subparsers(dest="agent_command", metavar="SUBCOMMAND", required=True)
+    step_parser = agent_sub.add_parser(
+        "step",
+        help="Выполнить один шаг Agent.step(date).",
+        description="Один шаг по спецификации 006: params_final (32), axis_final (8); с --lifecycle добавляются F, W, state.",
+    )
+    step_parser.add_argument(
+        "--date",
+        type=str,
+        required=True,
+        metavar="YYYY-MM-DD",
+        help="Дата симуляции (UTC noon).",
+    )
+    step_parser.add_argument(
+        "--lifecycle",
+        action="store_true",
+        help="Включить LifecycleEngine (research mode: F, W, state).",
+    )
+    step_parser.add_argument(
+        "--replay",
+        action="store_true",
+        help="Два прогона и проверка идентичности вывода.",
+    )
+    step_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Вывод одной строкой JSON.",
+    )
+    step_parser.set_defaults(func=_cmd_agent_step)
 
     args = parser.parse_args()
     args.func(args)
