@@ -2,10 +2,11 @@
 """
 005: Симуляция жизни с lifecycle — F, W, A_g, state по дням; при смерти снапшот.
 
-Опции: --days (макс дней на жизнь), --lives (число жизней), --seed, --no-lifecycle (сравнение с 002).
+Опции: --days (макс дней на жизнь, по умолчанию 365), --until-death (гнать до смерти), --lives, --seed, --no-lifecycle.
 Запуск из корня:
   python scripts/005/08_life_simulation_lifecycle.py
   python scripts/005/08_life_simulation_lifecycle.py --lives 5 --days 500 --seed 42
+  python scripts/005/08_life_simulation_lifecycle.py --until-death --lives 5
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ LONDON_LON = -0.1278
 DATE_FIRST = date(2000, 1, 1)
 TIME_SLOTS = [(6, 0), (18, 0)]
 LIFESPAN_MIN_Y = 50
-LIFESPAN_MAX_Y = 120
+LIFESPAN_MAX_Y = 1200
 
 
 def _build_natal(birth_date: date) -> dict | None:
@@ -52,6 +53,13 @@ def _end_date(birth: date, years: int) -> date:
         return date(birth.year + years, 2, 28)
 
 
+def _random_vector_for_life(life_index: int, birth_date: date, seed: int | None) -> tuple[float, ...]:
+    """Детерминированный вектор [0.25, 0.75] по индексу жизни и дате рождения (и опционально seed)."""
+    h = hash((seed if seed is not None else 0, life_index, birth_date.isoformat())) % (2**32)
+    rng = random.Random(h)
+    return tuple(0.25 + rng.random() * 0.5 for _ in range(NUM_PARAMETERS))
+
+
 def _run_one_life(
     birth_date: date,
     lifespan_years: int,
@@ -60,6 +68,7 @@ def _run_one_life(
     use_lifecycle: bool,
     life_index: int,
     max_days: int | None,
+    seed: int | None,
 ) -> dict | None:
     end_date = _end_date(birth_date, lifespan_years)
     if max_days is not None:
@@ -69,10 +78,12 @@ def _run_one_life(
     natal = _build_natal(birth_date) if use_astrology else None
     identity_id = f"life-005-{life_index}-{birth_date.isoformat()}"
     _registry.discard(identity_id)
+    base_vec = _random_vector_for_life(life_index, birth_date, seed)
+    sens_vec = _random_vector_for_life(life_index + 1000, birth_date, seed)
     identity = IdentityCore(
         identity_id=identity_id,
-        base_vector=(0.5,) * NUM_PARAMETERS,
-        sensitivity_vector=(0.5,) * NUM_PARAMETERS,
+        base_vector=base_vec,
+        sensitivity_vector=sens_vec,
     )
     memory_delta = (0.0,) * NUM_PARAMETERS
     memory_signature = ""
@@ -167,7 +178,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="005: Life simulation with lifecycle")
     parser.add_argument("--lives", type=int, default=10, help="Number of lives")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
-    parser.add_argument("--days", type=int, default=None, help="Max days per life (quick test)")
+    parser.add_argument("--days", type=int, default=365, help="Max days per life (default: 365, «первый год»)")
+    parser.add_argument("--until-death", action="store_true", help="Без лимита дней — гнать до смерти/трансценденции")
     parser.add_argument("--no-lifecycle", action="store_true", help="Disable lifecycle (002-only replay)")
     parser.add_argument("--no-astrology", action="store_true", help="No natal/transits")
     args = parser.parse_args()
@@ -193,11 +205,12 @@ def main() -> None:
         initial_f=0.0,
         initial_w=0.0,
     )
-    print(f"lifecycle={use_lifecycle} astrology={use_astrology} lives={len(birth_dates)}", file=sys.stderr)
+    max_days = None if args.until_death else args.days
+    print(f"lifecycle={use_lifecycle} astrology={use_astrology} lives={len(birth_dates)} max_days={max_days}", file=sys.stderr)
     for idx, birth_date in enumerate(birth_dates):
         lifespan_years = random.randint(LIFESPAN_MIN_Y, LIFESPAN_MAX_Y)
         out = _run_one_life(
-            birth_date, lifespan_years, config, use_astrology, use_lifecycle, idx, args.days
+            birth_date, lifespan_years, config, use_astrology, use_lifecycle, idx, max_days, args.seed
         )
         if out is None:
             continue
