@@ -58,22 +58,6 @@ No emotional manipulation.
 
 ---
 
-## Why Open Source?
-
-Because personality architecture should be:
-
-- Inspectable  
-- Deterministic  
-- Reproducible  
-- Extensible  
-
-We believe simulated subjectivity must be transparent at the system level.
-
-HnH is not about making AI "believe" it is human.  
-It is about designing structured behavioral systems that humans can experience.
-
----
-
 ## What We’re Building
 
 Phase 1:
