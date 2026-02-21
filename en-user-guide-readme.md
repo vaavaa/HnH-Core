@@ -28,15 +28,7 @@ source .venv/bin/activate   # Linux/macOS
 pip install -e .
 ```
 
-The `hnh` command will be available in this environment.
-
-**Optional (astrology layer — natal/transits):**
-
-```bash
-pip install -e ".[astrology]"
-```
-
-Without this extra, the engine uses a single fixed base vector; with it you can plug in natal chart and transits (when added to the CLI).
+The `hnh` command will be available. Astrology (natal/transits) is included in core. For accurate planet positions, place ephemeris files (.se1) in an **ephe** directory at the repo root; see `hnh.astrology.ephemeris.check_ephe_available()`. Without .se1 files, Swiss Ephemeris uses its built-in method (less precise).
 
 ---
 

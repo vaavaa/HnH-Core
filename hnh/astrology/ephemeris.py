@@ -2,7 +2,8 @@
 Planetary positions via Swiss Ephemeris (pyswisseph).
 All times in UTC; datetime normalization and location validation.
 
-Эфемериды: папка ephe в корне репозитория (файлы .se1 из github.com/aloistr/swisseph).
+Эфемериды: папка ephe в корне репозитория (файлы .se1 из github.com/aloistr/swisseph или astro.com/ftp/swisseph/ephe).
+Без файлов .se1 Swiss Ephemeris использует встроенный метод Moshier (менее точный).
 """
 
 from __future__ import annotations
@@ -12,7 +13,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 # Путь к папке ephe в корне репозитория (жёстко)
-_EPHE_PATH = str(Path(__file__).resolve().parent.parent.parent / "ephe")
+_EPHE_DIR = Path(__file__).resolve().parent.parent.parent / "ephe"
+_EPHE_PATH = str(_EPHE_DIR)
 
 try:
     import swisseph as swe
@@ -38,6 +40,25 @@ PLANETS_NATAL = [
 # Lat/lon bounds
 LAT_MIN, LAT_MAX = -90.0, 90.0
 LON_MIN, LON_MAX = -180.0, 180.0
+
+
+def get_ephe_path() -> Path:
+    """Возвращает путь к каталогу эфемерид (ephe в корне репозитория)."""
+    return _EPHE_DIR
+
+
+def check_ephe_available() -> tuple[bool, bool]:
+    """
+    Проверяет наличие каталога эфемерид и файлов расширения (.se1).
+
+    Returns:
+        (directory_exists, has_ephemeris_files): каталог ephe существует;
+        в нём есть хотя бы один файл .se1 (рекомендуется для точности; без файлов используется Moshier).
+    """
+    if not _EPHE_DIR.is_dir():
+        return (False, False)
+    has_se1 = any(_EPHE_DIR.glob("*.se1"))
+    return (True, has_se1)
 
 
 def normalize_birth_datetime_utc(

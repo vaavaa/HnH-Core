@@ -111,6 +111,8 @@ It is presence.
 🧪 Building v0.1 deterministic personality engine  
 🛠 Constitution-driven architecture  
 
+Releases are tagged in the repo (see [specs/007-release-tags-required](specs/007-release-tags-required/spec.md)); you can pin a dependency to a tag for reproducible installs (e.g. `v0.1.0`).
+
 Contributions, ideas, and research references are welcome.
 
 **User guides:** [Руководство (RU)](user-guide-readme.md) · [User guide (EN)](en-user-guide-readme.md)
