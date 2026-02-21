@@ -1,11 +1,14 @@
-# CI: тесты при push и при PR в main (спека 007 — воспроизводимость сборки)
+# CI: тесты при push и при PR в main (спека 007).
+# Автозапуск отключён — релизы делаются локально (см. scripts/release_local.md).
+# Чтобы включить CI снова: раскомментируйте блок on ниже и удалите workflow_dispatch.
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
 
 jobs:
   test:

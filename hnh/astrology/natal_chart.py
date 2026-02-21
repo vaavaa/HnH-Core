@@ -74,8 +74,10 @@ def _parse_birth_data(birth_data: dict[str, Any]) -> tuple[tuple[Planet, ...], t
     dt = birth_data.get("datetime_utc")
     if isinstance(dt, str):
         dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
-    if dt is None or dt.tzinfo is None:
-        dt = (dt or datetime.now(timezone.utc)).replace(tzinfo=timezone.utc)
+    if dt is None:
+        raise ValueError("datetime_utc is required for Variant A (datetime_utc, lat, lon)")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
     lat = float(birth_data["lat"])
     lon = float(birth_data["lon"])
     orb_config = getattr(asp, "OrbConfig", None)()

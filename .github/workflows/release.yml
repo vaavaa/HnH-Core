@@ -1,10 +1,13 @@
-# Release: при пуше тега v* — тесты, сборка пакета, создание GitHub Release (спека 007)
+# Release: при пуше тега v* (спека 007).
+# Автозапуск отключён — релизы делаются локально (см. scripts/release_local.md).
+# Чтобы включить снова: раскомментируйте push.tags и удалите workflow_dispatch.
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+  # push:
+  #   tags:
+  #     - "v*"
 
 jobs:
   test-and-build:

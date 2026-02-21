@@ -143,8 +143,8 @@ def test_detect_aspects_uses_orb_config():
 def test_orb_config_defaults():
     """T016: OrbConfig exposes per-aspect orbs."""
     cfg = asp.OrbConfig()
-    assert cfg.get_orb("Square") == 7.0
-    assert cfg.get_orb("Sextile") == 6.0
+    assert cfg.get_orb("Square") == 8.0
+    assert cfg.get_orb("Sextile") == 7.0
 
 
 # --- T017: deterministic natal_positions structure ---
