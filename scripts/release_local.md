@@ -37,7 +37,14 @@
 5. **Создайте Release на GitHub вручную:**
    - Откройте репозиторий на GitHub → вкладка **Releases** → **Draft a new release**.
    - В поле **Choose a tag** выберите только что запушенный тег (например, `v0.1.1`).
-   - Заполните заголовок и описание (можно сгенерировать notes).
+   - В поле **Describe this release** вставьте (подставьте свой тег и путь к репо):
+
+   ```
+   HnH — детерминированный движок симуляции личности (Identity Core, Dynamic State, натал/транзиты). Python 3.12+.
+
+   Установка по тегу: `pip install git+https://github.com/USER/REPO@vX.Y.Z`
+   Или скачать исходник (tar.gz) / wheel ниже.
+   ```
    - В блок **Attach binaries** перетащите файлы из вашего локального `dist/`:
      - `hnh-0.1.1.tar.gz`
      - `hnh-0.1.1-py3-none-any.whl`
