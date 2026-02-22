@@ -24,12 +24,12 @@ Add optional **sex-based modulation of transit response** so that sex affects pe
 
 ---
 
-## Constitution Check
+## Constitution Check (T017)
 
-- [x] **Determinism**: Same (natal, config, date, identity_hash) → same step() output; M[i] deterministic from E and Wdyn; no RNG.
+- [x] **Determinism**: Same (natal, config, date, identity_hash) → same step() output; M[i] deterministic from E and Wdyn; no RNG in 009 path.
 - [x] **Identity/Core separation**: 008 base_vector and E remain unchanged at birth; 009 modulates only the **transit path** at each step (bounded_delta → bounded_delta_eff before assemble_state), so identity *expression* over the life span is sex-dependent while the Core snapshot is immutable.
 - [x] **Behavioral parameterization**: Multipliers M[i] are numeric, versioned (Wdyn profile); no symbolic-only logic.
-- [x] **Logging & observability**: multiplier_stats and 009 debug fields only when 008 debug/audit mode enabled; no separate 009 flag; no plain sex/E by default (per 008).
+- [x] **Logging & observability**: multiplier_stats and 009 debug fields only when 008 debug/audit mode enabled (Agent(debug=True)); no separate 009 flag; no plain sex/E by default (per 008).
 - [x] **Repository standards**: Python, type hints; Wdyn profile and constants auditable and versioned; fail-fast errors documented.
 
 ---
@@ -69,7 +69,8 @@ Add optional **sex-based modulation of transit response** so that sex affects pe
 ### 5. Calibration (SC-004)
 
 - **Script**: Deterministic synthetic population (fixed seed, N≥10k natals, 50/50 sex), fixed date range; run male and female for each natal with `sex_transit_mode="scale_delta"`; compute per-axis `mean(d_axis_k(male) - d_axis_k(female))`, `p95(|d_axis_k(male) - d_axis_k(female)|)`, and **overlap** using the same formal criterion as 008 (Cohen's d ≤ threshold, e.g. 0.2; and/or overlap coefficient ≥ threshold, e.g. 0.9). Document thresholds in script or config. Fail if any axis violates SC-004.
-- **CI**: Run calibration when 009 modulation params (beta, mcap, Wdyn) change, or on every PR to 009; document invocation and script path.
+- **Script path**: `scripts/009/calibration_sex_transit.py`. Default thresholds: `|mean_diff| <= 0.01`, `p95 <= 0.10`, `|Cohen's d| <= 0.2` (same as 008). Overridable via `--mean-threshold`, `--p95-threshold`, `--cohen-threshold`. Options: `--seed`, `--n`, `--date`, `--days`.
+- **CI**: Run calibration when 009 modulation params (beta, mcap, Wdyn) change, or on every PR to 009. Example: `python scripts/009/calibration_sex_transit.py --n 2000` (or `--n 10000` for full run). Integration test in `tests/integration/test_009_calibration.py` runs the script with small N and loose thresholds for smoke check.
 
 ### 6. Tests
 

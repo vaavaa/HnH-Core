@@ -23,7 +23,7 @@
 
 **Purpose**: Verify feature environment and dependencies
 
-- [ ] T001 Verify feature branch 009-sex-transit-response and dependencies (008, 006) per specs/009-sex-transit-response/plan.md — ensure 008 identity (E, W32_V1) and 006 Agent/BehavioralCore/TransitState are available
+- [x] T001 Verify feature branch 009-sex-transit-response and dependencies (008, 006) per specs/009-sex-transit-response/plan.md — ensure 008 identity (E, W32_V1) and 006 Agent/BehavioralCore/TransitState are available
 
 ---
 
@@ -33,11 +33,11 @@
 
 **Checkpoint**: Foundation ready — user story implementation can begin
 
-- [ ] T002 Add 009 config fields (sex_transit_mode, sex_transit_beta, sex_transit_mcap, sex_transit_Wdyn_profile) with defaults off, 0.05, 0.10, "v1" in hnh/config/replay_config.py or a dedicated 009 config dataclass used by Agent (per plan; ReplayConfig may be frozen)
-- [ ] T003 Implement 009 config resolution (Agent config over ReplayConfig) and document resolution order in hnh/agent.py or in a helper in hnh/config/
-- [ ] T004 Implement validation: invalid sex_transit_mode (not in off/scale_delta/scale_sensitivity) or unknown sex_transit_Wdyn_profile → fail-fast with explicit error; document error type and message in docstrings or specs/009-sex-transit-response/plan.md
-- [ ] T005 [P] Register Wdyn profile "v1" mapping to W32_V1 in hnh/sex/transit_modulator.py (or hnh/sex/profiles.py); unknown profile name must raise (fail-fast)
-- [ ] T006 Implement SexTransitModulator: compute M[i] = clamp(1 + beta*E*Wdyn[i], 1-mcap, 1+mcap) and optional bounded_delta_eff given bounded_delta in hnh/sex/transit_modulator.py; deterministic, no I/O
+- [x] T002 Add 009 config fields (sex_transit_mode, sex_transit_beta, sex_transit_mcap, sex_transit_Wdyn_profile) with defaults off, 0.05, 0.10, "v1" in hnh/config/replay_config.py or a dedicated 009 config dataclass used by Agent (per plan; ReplayConfig may be frozen)
+- [x] T003 Implement 009 config resolution (Agent config over ReplayConfig) and document resolution order in hnh/agent.py or in a helper in hnh/config/
+- [x] T004 Implement validation: invalid sex_transit_mode (not in off/scale_delta/scale_sensitivity) or unknown sex_transit_Wdyn_profile → fail-fast with explicit error; document error type and message in docstrings or specs/009-sex-transit-response/plan.md
+- [x] T005 [P] Register Wdyn profile "v1" mapping to W32_V1 in hnh/sex/transit_modulator.py (or hnh/sex/profiles.py); unknown profile name must raise (fail-fast)
+- [x] T006 Implement SexTransitModulator: compute M[i] = clamp(1 + beta*E*Wdyn[i], 1-mcap, 1+mcap) and optional bounded_delta_eff given bounded_delta in hnh/sex/transit_modulator.py; deterministic, no I/O
 
 ---
 
@@ -49,9 +49,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] In Agent.step(), resolve 009 config (Agent over ReplayConfig); when sex_transit_mode="scale_delta" and E non-zero, compute M and bounded_delta_eff, build TransitState with bounded_delta=bounded_delta_eff, pass to behavior.apply_transits() — so transit response at every step (and thus identity expression over the life span) depends on sex; when off or E=0 pass transit_state unchanged in hnh/agent.py
-- [ ] T008 [US1] Integration test: sex_transit_mode="off" → male and female d_* identical; scale_delta with non-zero transit deltas → at least one axis d_* differs between male and female (transit-driven deltas over life differ by sex) in tests/integration/test_009_sex_transit_response.py
-- [ ] T009 [US1] Integration test: determinism — same natal/date/config/identity → same step() outputs with scale_delta in tests/integration/test_009_sex_transit_response.py
+- [x] T007 [US1] In Agent.step(), resolve 009 config (Agent over ReplayConfig); when sex_transit_mode="scale_delta" and E non-zero, compute M and bounded_delta_eff, build TransitState with bounded_delta=bounded_delta_eff, pass to behavior.apply_transits() — so transit response at every step (and thus identity expression over the life span) depends on sex; when off or E=0 pass transit_state unchanged in hnh/agent.py
+- [x] T008 [US1] Integration test: sex_transit_mode="off" → male and female d_* identical; scale_delta with non-zero transit deltas → at least one axis d_* differs between male and female (transit-driven deltas over life differ by sex) in tests/integration/test_009_sex_transit_response.py
+- [x] T009 [US1] Integration test: determinism — same natal/date/config/identity → same step() outputs with scale_delta in tests/integration/test_009_sex_transit_response.py
 
 **Checkpoint**: US1 complete — scale_delta makes transit-driven d_* (and thus identity expression over the life span) depend on sex; mode=off and determinism verified
 
@@ -65,8 +65,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T010 [P] [US2] Unit tests for SexTransitModulator: M[i] in [1-mcap, 1+mcap], symmetry M(male) ≈ 2 - M(female) for opposite E, E=0 → M[i]=1 in tests/unit/test_009_transit_modulator.py
-- [ ] T011 [US2] Unit test: invalid sex_transit_mode and unknown sex_transit_Wdyn_profile raise documented errors (fail-fast) in tests/unit/test_009_config_validation.py
+- [x] T010 [P] [US2] Unit tests for SexTransitModulator: M[i] in [1-mcap, 1+mcap], symmetry M(male) ≈ 2 - M(female) for opposite E, E=0 → M[i]=1 in tests/unit/test_009_transit_modulator.py
+- [x] T011 [US2] Unit test: invalid sex_transit_mode and unknown sex_transit_Wdyn_profile raise documented errors (fail-fast) in tests/unit/test_009_config_validation.py
 
 **Checkpoint**: US2 complete — bounds and symmetry and validation verified
 
@@ -80,8 +80,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] When 008 debug/audit mode is enabled and 009 is active, extend step result (or debug payload) with sex_transit_mode, beta, mcap, Wdyn_profile, multiplier_stats (min_M, max_M, mean_abs(M-1)); optionally max_abs(transit_delta), max_abs(transit_delta_eff) in hnh/agent.py
-- [ ] T013 [US3] Test: with 008 debug enabled and sex_transit_mode=scale_delta, step output includes 009 debug fields in tests/unit/test_009_agent_debug.py or tests/integration/test_009_sex_transit_response.py
+- [x] T012 [US3] When 008 debug/audit mode is enabled and 009 is active, extend step result (or debug payload) with sex_transit_mode, beta, mcap, Wdyn_profile, multiplier_stats (min_M, max_M, mean_abs(M-1)); optionally max_abs(transit_delta), max_abs(transit_delta_eff) in hnh/agent.py
+- [x] T013 [US3] Test: with 008 debug enabled and sex_transit_mode=scale_delta, step output includes 009 debug fields in tests/unit/test_009_agent_debug.py or tests/integration/test_009_sex_transit_response.py
 
 **Checkpoint**: US3 complete — observability via 008 debug only
 
@@ -91,10 +91,10 @@
 
 **Purpose**: Calibration (SC-004), documentation, constitution compliance
 
-- [ ] T014 Calibration script: deterministic synthetic population (fixed seed, N≥10k, 50/50 sex), fixed date range; run male/female per natal with scale_delta (transit response over life); compute per-axis mean diff, p95, and overlap (Cohen's d / overlap coefficient per 008); document thresholds in script or config; fail if SC-004 violated in scripts/009/calibration_sex_transit.py
-- [ ] T015 Document calibration thresholds and CI invocation (when to run script, script path) in specs/009-sex-transit-response/plan.md or scripts/009/README.md
-- [ ] T016 [P] Integration test for calibration: run calibration script on fixed seed and assert SC-004 thresholds (or allow configurable thresholds) in tests/integration/test_009_calibration.py
-- [ ] T017 Constitution compliance: confirm determinism (no RNG in 009 path), Identity/Core separation (009 modulates only transit path at each step — identity expression over life span is sex-dependent, Core at birth unchanged), logging (009 debug only when 008 debug on); note in specs/009-sex-transit-response/plan.md or checklist
+- [x] T014 Calibration script: deterministic synthetic population (fixed seed, N≥10k, 50/50 sex), fixed date range; run male/female per natal with scale_delta (transit response over life); compute per-axis mean diff, p95, and overlap (Cohen's d / overlap coefficient per 008); document thresholds in script or config; fail if SC-004 violated in scripts/009/calibration_sex_transit.py
+- [x] T015 Document calibration thresholds and CI invocation (when to run script, script path) in specs/009-sex-transit-response/plan.md or scripts/009/README.md
+- [x] T016 [P] Integration test for calibration: run calibration script on fixed seed and assert SC-004 thresholds (or allow configurable thresholds) in tests/integration/test_009_calibration.py
+- [x] T017 Constitution compliance: confirm determinism (no RNG in 009 path), Identity/Core separation (009 modulates only transit path at each step — identity expression over life span is sex-dependent, Core at birth unchanged), logging (009 debug only when 008 debug on); note in specs/009-sex-transit-response/plan.md or checklist
 
 ---
 
