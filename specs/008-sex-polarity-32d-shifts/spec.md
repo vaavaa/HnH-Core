@@ -42,7 +42,7 @@ As a developer building an HnH agent for product use, I want to set `sex` explic
 **Acceptance Scenarios**:
 1. **Given** `sex_mode="explicit"` and `birth_data.sex` is missing, **When** `Agent.step()` runs, **Then** `sex=None`, `E=0`, and `sex_delta_32` is all zeros (baseline preserved).
 2. **Given** `sex_mode="explicit"` and `birth_data.sex="male"`, **When** `Agent.step()` runs, **Then** output includes `sex="male"`, `E!=0` (unless configured otherwise), and the following bounds hold: ∀i: |params_final_sex[i] − params_final_baseline[i]| ≤ sex_max_param_delta; ∀k: |axis_final_sex[k] − axis_final_baseline[k]| ≤ sex_max_param_delta. The difference may be smaller if E=0 or due to clamp01 saturation.
-3. **Given** `sex_mode="explicit"` and `birth_data.sex="female"`, **When** `Agent.step()` runs, **Then** `sex="female"` and resulting `sex_delta_32` is approximately the negative of the male delta (up to clamp saturation).
+3. **Given** `sex_mode="explicit"` and `birth_data.sex="female"`, **When** `Agent.step()` runs, **Then** `sex="female"` and for the same natal/date the symmetry bound holds: ∀i: |sex_delta_32_female[i] + sex_delta_32_male[i]| ≤ 2×sex_max_param_delta (default 0.08). Without clamp01 saturation the two deltas are exactly opposite; the bound accommodates saturation.
 4. **Given** identical inputs (same natal, same config, same date), **When** `Agent.step()` runs twice, **Then** outputs are byte-for-byte identical (determinism).
 
 ---
@@ -147,7 +147,7 @@ The following bounds MUST hold for the default profile (sex_strength=0.03, sex_m
 - **BOUND-32-1**: ∀i: |sex_delta[i]| ≤ sex_max_param_delta (default 0.04). Follows from the clamp in FR-017.
 - **BOUND-32-2**: L1(sex_delta) ≤ 32 × sex_max_param_delta = 1.28 (theoretical maximum; useful for sanity checks).
 - **BOUND-32-3**: L∞(sex_delta) ≤ sex_max_param_delta (0.04).
-- **BOUND-AXIS-1**: ∀k: |axis_final_sex[k] − axis_final_baseline[k]| ≤ sex_max_param_delta. Because each axis is the mean of 4 parameters and each parameter delta is bounded by sex_max_param_delta, the axis-level shift cannot exceed it (before clamp01).
+- **BOUND-AXIS-1**: ∀k: |axis_final_sex[k] − axis_final_baseline[k]| ≤ sex_max_param_delta. Axis value is defined as axis_k = (1/4) Σ_{j=0..3} params[4k+j] for k ∈ {0,…,7}; canonical parameter order in [spec 002](../002-hierarchical-personality-model/spec.md). Because each parameter delta is bounded by sex_max_param_delta, the axis-level shift cannot exceed it (before clamp01).
 - **BOUND-VEC-1**: mean(|sex_delta|) ≤ sex_strength when |E|≤1 and |W32[i]|≤1. Always satisfied by construction; testable.
 
 Population-level guardrails (e.g. mean axis difference, overlap) remain in calibration (SC-004).
@@ -228,8 +228,8 @@ Thus **sex_delta_32 is applied before transit**; it is fixed at identity level a
 ### Measurable Outcomes
 
 - **SC-001**: Determinism — for fixed inputs (natal, config, date, identity_hash), repeated `Agent.step()` runs produce identical outputs.
-- **SC-002**: Symmetry — for same natal/date, `sex_delta_32(male) ≈ -sex_delta_32(female)` (differences only due to clamp01 saturation).
-- **SC-003**: Bounds — `params_final` always lies in [0,1], and BOUND-32-1 / BOUND-32-3 hold: max(|sex_delta[i]|) ≤ sex_max_param_delta (default 0.04); axis-level shift per BOUND-AXIS-1.
+- **SC-002**: Symmetry — for same natal/date, ∀i: |sex_delta_32_female[i] + sex_delta_32_male[i]| ≤ 2×sex_max_param_delta (default 0.08). Without clamp01 saturation the deltas are exactly opposite.
+- **SC-003**: Bounds — `params_final` ∈ [0,1]; per-parameter and axis shifts as in § Bounds (32D): BOUND-32-1, BOUND-32-3, BOUND-AXIS-1.
 - **SC-004**: Calibration sanity (balanced sexes, N=10k natals):
   - For each axis k: `|mean(axis_male - axis_female)| <= 0.01`
   - `p95(|axis_male - axis_female|) <= 0.10`
@@ -258,7 +258,7 @@ Thus **sex_delta_32 is applied before transit**; it is fixed at identity level a
 - Inference MUST be opt-in. Default behavior MUST preserve baseline for legacy data (no silent physics changes).
 - All tie-breaks MUST be deterministic (no RNG).
 - All weights and constants MUST be versioned and auditable (W32 profile names).
-- **Logging**: By default do not log sex or birth_data in plain form; any opt-in audit/debug logging of sensitive fields MUST be documented.
+- **Logging**: By default do not log sex or birth_data in plain form; any opt-in audit/debug logging of sensitive fields MUST be documented. Spec 008 does not define the project-wide structured logging format (see constitution §4); it only constrains what MUST NOT be logged (FR-021a).
 
 ---
 

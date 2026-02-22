@@ -51,7 +51,7 @@
 
 ### Tests US1
 
-- [ ] T011 [P] [US1] Юнит-тесты SignPolarityEngine: формула, веса, отсутствующие планеты; SectEngine: высота и дома; SexPolarityEngine: формула E; SexDelta32Engine: W32 v1, границы. В `tests/unit/test_008_sign_polarity.py`, `test_008_sect.py`, `test_008_polarity.py`, `test_008_delta_32.py`.
+- [ ] T011 [P] [US1] Юнит-тесты SignPolarityEngine: формула, веса, отсутствующие планеты; SectEngine: высота и дома; SexPolarityEngine: формула E; SexDelta32Engine: W32 v1, границы (BOUND-32-1, BOUND-32-3, при желании BOUND-VEC-1: mean(|sex_delta|) ≤ sex_strength). В `tests/unit/test_008_sign_polarity.py`, `test_008_sect.py`, `test_008_polarity.py`, `test_008_delta_32.py`.
 - [ ] T012 [P] [US1] **Contract test (FR-022a)**: порядок осей и параметров W32 и sex_delta_32 MUST совпадать с каноническим 32D порядком из спеки 002 (индексы/имена осей). Тест: сравнение с эталоном из 002 или контракт-схемой. Размещение: `tests/unit/test_008_w32_contract.py` или `tests/contract/test_008_w32_order.py`. Зависит от T007.
 - [ ] T013 [US1] Юнит-тесты: невалидный sex → fail-fast (тип и сообщение); порядок разрешения sex_mode. В `tests/unit/test_008_resolver.py` или `test_008_validation.py`.
 - [ ] T014 [US1] Интеграционные тесты: identity с sex=male/female/None; base_vector включает sex_delta_32; одинаковые входы → одинаковый step() (детерминизм); sex_delta_32(male) ≈ -sex_delta_32(female) для одного натала. В `tests/integration/test_008_identity_sex.py`. Тесты уровня **Agent** (step() возвращает sex и sex_polarity_E, Agent с birth_data.sex, детерминизм step) — в `tests/unit/test_008_agent_sex.py`.
