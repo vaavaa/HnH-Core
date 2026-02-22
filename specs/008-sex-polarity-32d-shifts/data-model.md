@@ -19,6 +19,8 @@ The system receives **birth data** (date, time, place, etc.) and **sex of the pe
 
 **Priority when sex is provided in multiple places**: If both `birth_data.sex` and another source (e.g. agent config) specify sex, **`birth_data.sex` MUST take precedence**. The implementation MUST document the full resolution order (e.g. birth_data.sex > agent_config.sex > default None).
 
+**sex_mode resolution order (implementation)**: 1) `birth_data.sex_mode`; 2) if absent, agent/replay config `sex_mode`; 3) default `"explicit"`. See `hnh.sex.resolution.resolve_sex_mode`.
+
 Other birth_data fields (date, time, place, positions, etc.) follow 006 / existing natal contracts.
 
 ---
@@ -31,6 +33,12 @@ Other birth_data fields (date, time, place, positions, etc.) follow 006 / existi
   - A field on `identity_config` (e.g. `identity_config.identity_hash`) set when building identity from birth_data.
   - A dedicated identifier provided at Agent construction and stored in identity.
 - **Type**: Implementation-defined (bytes, int, or string). Tie-break uses a deterministic function of this value (e.g. `male` if `hash_deterministic(identity_hash) % 2 == 1` else `female`). The hash function MUST be deterministic across process runs (e.g. xxhash per project rules, then low bit), not Python’s built-in `hash()`.
+
+---
+
+### Implementation (008)
+
+- **Source**: Digest of `birth_data` via `orjson.dumps(birth_data, option=orjson.OPT_SORT_KEYS)` then `xxhash.xxh3_128(blob, seed=0)`. Tie-break = low bit of digest. See `hnh.sex.identity_hash.identity_hash_for_tie_break` and `tie_break_parity`.
 
 ---
 

@@ -24,11 +24,11 @@ Implement sex as an external input to identity: **birth_data.sex** and **sex_mod
 
 ## Constitution Check
 
-- [ ] **Determinism**: Same (birth_data, config, date, identity_hash) → same step() output; sex inference and E use only deterministic logic; tie-break via deterministic hash (e.g. xxhash).
-- [ ] **Identity/Core separation**: Sex is part of identity; base_vector = natal_base + sex_delta_32 is built once at identity assembly; BehavioralCore never mutates base_vector; Dynamic State (step) does not recompute sex.
-- [ ] **Behavioral parameterization**: Sex maps to scalar E and to 32D deltas (W32); no symbolic-only logic; weights and W32 versioned.
-- [ ] **Logging & observability**: step() output includes sex and sex_polarity_E; debug/research may expose sign_polarity_score, sect, sex_delta_32; FR-021a: by default do not log sex/birth_data in plain form; opt-in audit mode documented.
-- [ ] **Repository standards**: Python, type hints, orjson/xxhash where applicable; W32 and constants auditable and versioned.
+- [x] **Determinism**: Same (birth_data, config, date, identity_hash) → same step() output; sex inference and E use only deterministic logic; tie-break via deterministic hash (e.g. xxhash).
+- [x] **Identity/Core separation**: Sex is part of identity; base_vector = natal_base + sex_delta_32 is built once at identity assembly; BehavioralCore never mutates base_vector; Dynamic State (step) does not recompute sex.
+- [x] **Behavioral parameterization**: Sex maps to scalar E and to 32D deltas (W32); no symbolic-only logic; weights and W32 versioned.
+- [x] **Logging & observability**: step() output includes sex and sex_polarity_E; debug/research may expose sign_polarity_score, sect, sex_delta_32; FR-021a: by default do not log sex/birth_data in plain form; opt-in audit mode documented.
+- [x] **Repository standards**: Python, type hints, orjson/xxhash where applicable; W32 and constants auditable and versioned.
 
 ---
 

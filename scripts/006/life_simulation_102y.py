@@ -6,6 +6,9 @@
 Agent.step(date) — один оркестратор (natal + behavior + transits). Без phase smoothing;
 каждый день два расчёта (утро/вечер UTC). Натал и зодиак через NatalChart и ZodiacExpression.
 
+Для каждой даты рождения выполняются две итерации (male и female) с одним и тем же наталом и seed,
+чтобы на одной дате оценить мутации всех параметров по полу (008).
+
 Запуск из корня проекта (venv активирован):
   python scripts/006/life_simulation_102y.py
   python scripts/006/life_simulation_102y.py --lives 50 --seed 42
@@ -109,10 +112,12 @@ def _run_one_life(
     use_astrology: bool,
     life_index: int,
     max_days: int | None = None,
+    sex: str | None = None,
 ) -> dict[str, Any] | None:
     """
     Один проход жизни через Agent.step() (006). Возвращает словарь с дельтами осей
     и параметрами натала/транзита, либо None при ошибке.
+    sex: "male" | "female" для 008; при None пол не передаётся (baseline).
     """
     end_date = _end_date_for_lifespan(birth_date, lifespan_years)
     if max_days is not None:
@@ -132,6 +137,8 @@ def _run_one_life(
                 {"planet": "Moon", "longitude": 30.0},
             ],
         }
+    if sex is not None:
+        birth_data = {**birth_data, "sex": sex}
 
     agent = Agent(birth_data, config=config, lifecycle=False)
     start_params: tuple[float, ...] | None = None
@@ -167,6 +174,7 @@ def _run_one_life(
     delta_params = tuple(e - s for s, e in zip(start_params, end_params))
 
     out: dict[str, Any] = {
+        "sex": getattr(agent._last_step_result, "sex", None) if getattr(agent, "_last_step_result", None) else birth_data.get("sex"),
         "delta_axis": delta_axis,
         "delta_params": delta_params,
         "mean_abs_axis": sum(abs(d) for d in delta_axis) / len(delta_axis),
@@ -250,7 +258,7 @@ def run() -> None:
     config = ReplayConfig(global_max_delta=0.15, shock_threshold=0.8, shock_multiplier=1.5)
 
     header_parts = [
-        "birth_date", "lifespan_years",
+        "birth_date", "sex", "lifespan_years",
         "natal_dom_sign", "natal_dom_element", "natal_zodiac_hash",
         "natal_asc", "natal_mc",
         "transit_start_dom", "transit_start_el",
@@ -262,29 +270,31 @@ def run() -> None:
 
     for idx, birth_date in enumerate(birth_dates):
         lifespan_years = random.randint(LIFESPAN_MIN, LIFESPAN_MAX)
-        result = _run_one_life(birth_date, lifespan_years, config, use_astrology, idx, args.days)
-        if result is None:
-            print(f"{birth_date.isoformat()}\t{lifespan_years}\tERROR", file=sys.stderr)
-            continue
-        asc = result.get("natal_ascendant")
-        mc = result.get("natal_mc")
-        row = [
-            birth_date.isoformat(),
-            str(lifespan_years),
-            result.get("natal_dominant_sign_name") or "",
-            result.get("natal_dominant_sign_element") or "",
-            (result.get("natal_zodiac_hash") or "")[:16],
-            f"{asc:.1f}" if asc is not None else "",
-            f"{mc:.1f}" if mc is not None else "",
-            result.get("transit_start_dominant_sign_name") or "",
-            result.get("transit_start_dominant_sign_element") or "",
-            result.get("transit_end_dominant_sign_name") or "",
-            result.get("transit_end_dominant_sign_element") or "",
-        ]
-        row += [f"{d:+.6f}" for d in result["delta_axis"]]
-        row.append(f"{result['mean_abs_axis']:.6f}")
-        row.append(f"{result['max_abs_params']:.6f}")
-        print("\t".join(row))
+        for sex in ("male", "female"):
+            result = _run_one_life(birth_date, lifespan_years, config, use_astrology, idx, args.days, sex=sex)
+            if result is None:
+                print(f"{birth_date.isoformat()}\t{sex}\t{lifespan_years}\tERROR", file=sys.stderr)
+                continue
+            asc = result.get("natal_ascendant")
+            mc = result.get("natal_mc")
+            row = [
+                birth_date.isoformat(),
+                result.get("sex") or sex,
+                str(lifespan_years),
+                result.get("natal_dominant_sign_name") or "",
+                result.get("natal_dominant_sign_element") or "",
+                (result.get("natal_zodiac_hash") or "")[:16],
+                f"{asc:.1f}" if asc is not None else "",
+                f"{mc:.1f}" if mc is not None else "",
+                result.get("transit_start_dominant_sign_name") or "",
+                result.get("transit_start_dominant_sign_element") or "",
+                result.get("transit_end_dominant_sign_name") or "",
+                result.get("transit_end_dominant_sign_element") or "",
+            ]
+            row += [f"{d:+.6f}" for d in result["delta_axis"]]
+            row.append(f"{result['mean_abs_axis']:.6f}")
+            row.append(f"{result['max_abs_params']:.6f}")
+            print("\t".join(row))
         sys.stdout.flush()
 
 
