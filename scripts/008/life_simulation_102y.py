@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-006: Симуляция многих жизней — случайные даты рождения (от Рождества до сегодня), Лондон.
+008: Симуляция многих жизней с учётом пола — случайные даты рождения (от Р.Х. до сегодня), Лондон.
 
-Та же идея, что 004/09_life_simulation_102y.py, но на логике спецификации 006:
-Agent.step(date) — один оркестратор (natal + behavior + transits). Без phase smoothing;
-каждый день два расчёта (утро/вечер UTC). Натал и зодиак через NatalChart и ZodiacExpression.
+На базе 006: Agent.step(date), натал + транзиты. Для каждой даты рождения выполняются
+две итерации (male и female) с одним и тем же наталом и seed, чтобы на одной дате
+оценить мутации всех параметров по полу (008). В выводе — колонка sex.
 
 Запуск из корня проекта (venv активирован):
-  python scripts/006/life_simulation_102y.py
-  python scripts/006/life_simulation_102y.py --lives 50 --seed 42
-  python scripts/006/life_simulation_102y.py --lives 5 --days 365   # быстрый тест
+  python scripts/008/life_simulation_102y.py
+  python scripts/008/life_simulation_102y.py --lives 50 --seed 42
+  python scripts/008/life_simulation_102y.py --lives 5 --days 365   # быстрый тест
 """
 
 from __future__ import annotations
@@ -36,8 +36,9 @@ from hnh.astrology import ephemeris as eph
 from hnh.astrology import houses as hou
 from hnh.astrology.zodiac_expression import ZodiacExpression
 from hnh.config.replay_config import ReplayConfig
-from hnh.identity.schema import AXES
+from hnh.identity.schema import AXES, NUM_PARAMETERS
 from hnh.lifecycle.engine import aggregate_axis
+from hnh.sex.delta_32 import compute_sex_delta_32, DEFAULT_SEX_MAX_PARAM_DELTA
 
 # Лондон
 LONDON_LAT = 51.5074
@@ -109,10 +110,12 @@ def _run_one_life(
     use_astrology: bool,
     life_index: int,
     max_days: int | None = None,
+    sex: str | None = None,
 ) -> dict[str, Any] | None:
     """
     Один проход жизни через Agent.step() (006). Возвращает словарь с дельтами осей
     и параметрами натала/транзита, либо None при ошибке.
+    sex: "male" | "female" для 008; при None пол не передаётся (baseline).
     """
     end_date = _end_date_for_lifespan(birth_date, lifespan_years)
     if max_days is not None:
@@ -132,6 +135,8 @@ def _run_one_life(
                 {"planet": "Moon", "longitude": 30.0},
             ],
         }
+    if sex is not None:
+        birth_data = {**birth_data, "sex": sex}
 
     agent = Agent(birth_data, config=config, lifecycle=False)
     start_params: tuple[float, ...] | None = None
@@ -166,11 +171,25 @@ def _run_one_life(
     delta_axis = tuple(e - s for s, e in zip(start_axis, end_axis))
     delta_params = tuple(e - s for s, e in zip(start_params, end_params))
 
+    E = 0.0
+    if getattr(agent, "_last_step_result", None) is not None:
+        E = getattr(agent._last_step_result, "sex_polarity_E", 0.0)
+    sex_delta_32 = compute_sex_delta_32(E)
+    max_abs_sd32 = max(abs(x) for x in sex_delta_32)
+    mean_abs_sd32 = sum(abs(x) for x in sex_delta_32) / NUM_PARAMETERS if NUM_PARAMETERS else 0.0
+
     out: dict[str, Any] = {
+        "sex": getattr(agent._last_step_result, "sex", None) if getattr(agent, "_last_step_result", None) else birth_data.get("sex"),
         "delta_axis": delta_axis,
         "delta_params": delta_params,
         "mean_abs_axis": sum(abs(d) for d in delta_axis) / len(delta_axis),
         "max_abs_params": max(abs(d) for d in delta_params),
+        "end_params": end_params,
+        "end_axis": end_axis,
+        "E": E,
+        "sex_delta_32": sex_delta_32,
+        "max_abs_sex_delta_32": max_abs_sd32,
+        "mean_abs_sex_delta_32": mean_abs_sd32,
     }
 
     # Натальный зодиак и дома (006: ZodiacExpression от agent.natal)
@@ -221,7 +240,7 @@ def _run_one_life(
 
 def run() -> None:
     parser = argparse.ArgumentParser(
-        description="006: случайные жизни (даты от Р.Х. до сегодня), 70–108 лет, Agent.step(), дельты + зодиак/дома"
+        description="008: случайные жизни с полом (male/female на одну дату), 70–108 лет, Agent.step(), дельты + зодиак/дома"
     )
     parser.add_argument("--lives", type=int, default=200, metavar="N", help="Количество жизней")
     parser.add_argument("--seed", type=int, default=None, metavar="S", help="Seed для воспроизводимости")
@@ -245,12 +264,12 @@ def run() -> None:
         print("Астрология недоступна (pip install -e \".[astrology]\"), используется минимальный натал.", file=sys.stderr)
         use_astrology = False
     else:
-        print("006: Agent.step(), натал + транзиты. Лондон.", file=sys.stderr)
+        print("008: Agent.step(), натал + транзиты, male/female на одну дату. Лондон.", file=sys.stderr)
 
     config = ReplayConfig(global_max_delta=0.15, shock_threshold=0.8, shock_multiplier=1.5)
 
     header_parts = [
-        "birth_date", "lifespan_years",
+        "birth_date", "sex", "lifespan_years",
         "natal_dom_sign", "natal_dom_element", "natal_zodiac_hash",
         "natal_asc", "natal_mc",
         "transit_start_dom", "transit_start_el",
@@ -262,29 +281,71 @@ def run() -> None:
 
     for idx, birth_date in enumerate(birth_dates):
         lifespan_years = random.randint(LIFESPAN_MIN, LIFESPAN_MAX)
-        result = _run_one_life(birth_date, lifespan_years, config, use_astrology, idx, args.days)
-        if result is None:
-            print(f"{birth_date.isoformat()}\t{lifespan_years}\tERROR", file=sys.stderr)
-            continue
-        asc = result.get("natal_ascendant")
-        mc = result.get("natal_mc")
-        row = [
-            birth_date.isoformat(),
-            str(lifespan_years),
-            result.get("natal_dominant_sign_name") or "",
-            result.get("natal_dominant_sign_element") or "",
-            (result.get("natal_zodiac_hash") or "")[:16],
-            f"{asc:.1f}" if asc is not None else "",
-            f"{mc:.1f}" if mc is not None else "",
-            result.get("transit_start_dominant_sign_name") or "",
-            result.get("transit_start_dominant_sign_element") or "",
-            result.get("transit_end_dominant_sign_name") or "",
-            result.get("transit_end_dominant_sign_element") or "",
-        ]
-        row += [f"{d:+.6f}" for d in result["delta_axis"]]
-        row.append(f"{result['mean_abs_axis']:.6f}")
-        row.append(f"{result['max_abs_params']:.6f}")
-        print("\t".join(row))
+        results_by_sex: dict[str, dict[str, Any]] = {}
+        for sex in ("male", "female"):
+            result = _run_one_life(birth_date, lifespan_years, config, use_astrology, idx, args.days, sex=sex)
+            if result is None:
+                print(f"{birth_date.isoformat()}\t{sex}\t{lifespan_years}\tERROR", file=sys.stderr)
+                continue
+            results_by_sex[sex] = result
+            # Проверка B: диагностика по полу (E, sex_delta_32)
+            s = result.get("sex") or sex
+            E_val = result.get("E", 0.0)
+            ma = result.get("max_abs_sex_delta_32", 0.0)
+            mea = result.get("mean_abs_sex_delta_32", 0.0)
+            print(
+                f"CHECK_B\t{birth_date.isoformat()}\tsex={s}\tE={E_val:+.4f}\tmax_abs(sex_delta_32)={ma:.6f}\tmean_abs(sex_delta_32)={mea:.6f}",
+                file=sys.stderr,
+            )
+            asc = result.get("natal_ascendant")
+            mc = result.get("natal_mc")
+            row = [
+                birth_date.isoformat(),
+                result.get("sex") or sex,
+                str(lifespan_years),
+                result.get("natal_dominant_sign_name") or "",
+                result.get("natal_dominant_sign_element") or "",
+                (result.get("natal_zodiac_hash") or "")[:16],
+                f"{asc:.1f}" if asc is not None else "",
+                f"{mc:.1f}" if mc is not None else "",
+                result.get("transit_start_dominant_sign_name") or "",
+                result.get("transit_start_dominant_sign_element") or "",
+                result.get("transit_end_dominant_sign_name") or "",
+                result.get("transit_end_dominant_sign_element") or "",
+            ]
+            row += [f"{d:+.6f}" for d in result["delta_axis"]]
+            row.append(f"{result['mean_abs_axis']:.6f}")
+            row.append(f"{result['max_abs_params']:.6f}")
+            print("\t".join(row))
+        # Проверка A: сравнение абсолютных состояний male vs female (один натал, одна дата транзита)
+        if "male" in results_by_sex and "female" in results_by_sex:
+            rm = results_by_sex["male"]
+            rf = results_by_sex["female"]
+            pm = rm.get("end_params")
+            pf = rf.get("end_params")
+            ax_m = rm.get("end_axis")
+            ax_f = rf.get("end_axis")
+            if pm is not None and pf is not None and len(pm) == len(pf):
+                diffs = [abs(a - b) for a, b in zip(pm, pf)]
+                max_abs_params_diff = max(diffs)
+                mean_abs_params_diff = sum(diffs) / len(diffs)
+            else:
+                max_abs_params_diff = mean_abs_params_diff = float("nan")
+            if ax_m is not None and ax_f is not None and len(ax_m) == len(ax_f):
+                axis_diff = tuple(a - b for a, b in zip(ax_m, ax_f))
+                axis_diff_ok = all(abs(d) <= DEFAULT_SEX_MAX_PARAM_DELTA for d in axis_diff)
+            else:
+                axis_diff = ()
+                axis_diff_ok = False
+            # Разница male−female = 2*sex_delta_32 (E противоположны), поэтому граница 2*sex_max_param_delta
+            max_diff_bound = 2.0 * DEFAULT_SEX_MAX_PARAM_DELTA
+            in_bounds = (0 < max_abs_params_diff <= max_diff_bound) if max_abs_params_diff == max_abs_params_diff else False
+            print(
+                f"CHECK_A\t{birth_date.isoformat()}\tmax_abs_params_diff={max_abs_params_diff:.6f}\tmean_abs_params_diff={mean_abs_params_diff:.6f}\t"
+                f"axis_diff=[{','.join(f'{d:+.4f}' for d in axis_diff)}]\t"
+                f"in_bounds(0<max≤{max_diff_bound:.2f})={in_bounds}\taxis_diff_per_axis≤0.04={axis_diff_ok}",
+                file=sys.stderr,
+            )
         sys.stdout.flush()
 
 
