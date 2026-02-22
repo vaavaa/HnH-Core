@@ -15,7 +15,7 @@ The system receives **birth data** (date, time, place, etc.) and **sex of the pe
 | Field        | Type                     | Required | Description |
 |-------------|---------------------------|----------|-------------|
 | `sex`       | `"male" \| "female" \| None` | No       | **External input**: sex of the person, supplied with birth data. When provided, used as-is (explicit). When absent, behavior depends on `sex_mode` (baseline or infer). |
-| `sex_mode`  | `"explicit" \| "infer"`   | No       | Default `"explicit"`. If `sex_mode` is not on `birth_data`, it MAY be taken from agent/replay config; the implementation MUST document the resolution order. |
+| `sex_mode`  | `"explicit" \| "infer"`   | No       | Default `"explicit"`. **Resolution order: `birth_data.sex_mode` first; if absent, agent/replay config.** Implementation MUST document the full order. |
 
 **Priority when sex is provided in multiple places**: If both `birth_data.sex` and another source (e.g. agent config) specify sex, **`birth_data.sex` MUST take precedence**. The implementation MUST document the full resolution order (e.g. birth_data.sex > agent_config.sex > default None).
 
@@ -30,14 +30,14 @@ Other birth_data fields (date, time, place, positions, etc.) follow 006 / existi
   - A digest of `birth_data` (e.g. canonical JSON or sorted key-value hash).
   - A field on `identity_config` (e.g. `identity_config.identity_hash`) set when building identity from birth_data.
   - A dedicated identifier provided at Agent construction and stored in identity.
-- **Type**: Implementation-defined (bytes, int, or string). Tie-break uses a deterministic function of this value (e.g. `male` if `hash_deterministic(identity_hash) % 2 == 1` else `female`). The hash function MUST be deterministic across process runs (e.g. SHA-256 then low bit), not Python’s built-in `hash()`.
+- **Type**: Implementation-defined (bytes, int, or string). Tie-break uses a deterministic function of this value (e.g. `male` if `hash_deterministic(identity_hash) % 2 == 1` else `female`). The hash function MUST be deterministic across process runs (e.g. xxhash per project rules, then low bit), not Python’s built-in `hash()`.
 
 ---
 
 ## Infer mode: insufficient natal data
 
-- **Config**: **`infer_on_insufficient_data`** (or equivalent name): `"fail"` | `"none"`. Default MUST be documented (recommended: `"fail"`). When `"fail"`, the system MUST raise a clear error if polarity score cannot be computed. When `"none"`, the system MUST set `sex=None` and E=0, and MAY set `sex_inference_skipped: true` in output.
-- **Minimal required for inference**: At least **Sun** MUST have a known sign. Implementations MAY require additional planets (e.g. Moon) and MUST document the minimal set. If that set is not available and `infer_on_insufficient_data="none"`, output is `sex=None`; if `"fail"`, error.
+- **Behaviour**: When natal data are insufficient to compute polarity score (e.g. no Sun sign), the system MUST **fail-fast** with an explicit error. **Fallback to `sex=None` or any optional skip is not permitted.**
+- **Minimal required for inference**: At least **Sun** MUST have a known sign. Implementations MAY require more planets and MUST document the minimal set. If that set is not available, the system MUST raise a clear error.
 
 ---
 

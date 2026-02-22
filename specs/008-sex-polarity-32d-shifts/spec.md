@@ -9,6 +9,18 @@
 
 ---
 
+## Clarifications
+
+### Session 2026-02-22
+
+- Q: When `sex` is invalid (typo, empty string, wrong type), should the system fail-fast or treat as None? → A: Fail-fast by default: invalid `sex` MUST raise an explicit error; implementation MUST document the error type and message.
+- Q: Default for infer_on_insufficient_data when natal data are insufficient for inference? → A: Only `"fail"` is allowed: insufficient data MUST cause an explicit error; fallback to `sex=None` (or optional skip) is not permitted.
+- Q: Should the spec constrain logging of sex / birth_data (privacy)? → A: By default MUST NOT log sex or birth_data in plain form; optional audit/debug mode that logs them MUST be opt-in and documented.
+- Q: When both birth_data and agent config provide sex_mode, which wins? → A: birth_data first: if birth_data.sex_mode is present use it; otherwise use agent config. Implementation MUST document the full resolution order.
+- Q: Recommended calibration data source (fixed dataset in repo vs synthetic)? → A: Recommend deterministic synthetic population (fixed seed); fixed dataset in repo not required. Implementation MUST document which source is used and where stored (e.g. seed value).
+
+---
+
 ## Input contract: sex is external
 
 - **Пол задаётся снаружи**: в систему передаются **дата рождения** (и прочие натальные данные) и **пол личности**. Пол не выводится внутри функций движка; это входной параметр личности.
@@ -29,7 +41,7 @@ As a developer building an HnH agent for product use, I want to set `sex` explic
 
 **Acceptance Scenarios**:
 1. **Given** `sex_mode="explicit"` and `birth_data.sex` is missing, **When** `Agent.step()` runs, **Then** `sex=None`, `E=0`, and `sex_delta_32` is all zeros (baseline preserved).
-2. **Given** `sex_mode="explicit"` and `birth_data.sex="male"`, **When** `Agent.step()` runs, **Then** output includes `sex="male"`, `E!=0` (unless configured otherwise), and `params_final` differs from baseline within configured bounds.
+2. **Given** `sex_mode="explicit"` and `birth_data.sex="male"`, **When** `Agent.step()` runs, **Then** output includes `sex="male"`, `E!=0` (unless configured otherwise), and the following bounds hold: ∀i: |params_final_sex[i] − params_final_baseline[i]| ≤ sex_max_param_delta; ∀k: |axis_final_sex[k] − axis_final_baseline[k]| ≤ sex_max_param_delta. The difference may be smaller if E=0 or due to clamp01 saturation.
 3. **Given** `sex_mode="explicit"` and `birth_data.sex="female"`, **When** `Agent.step()` runs, **Then** `sex="female"` and resulting `sex_delta_32` is approximately the negative of the male delta (up to clamp saturation).
 4. **Given** identical inputs (same natal, same config, same date), **When** `Agent.step()` runs twice, **Then** outputs are byte-for-byte identical (determinism).
 
@@ -46,7 +58,7 @@ As a researcher or simulation user, I want the system to infer `sex` determinist
 **Acceptance Scenarios**:
 1. **Given** `sex_mode="infer"` and `birth_data.sex` is missing, **When** `SexResolver` runs, **Then** sex is chosen using the inference algorithm (below) deterministically.
 2. **Given** the computed score `S` falls within the tie zone `[-T, +T]`, **When** resolving sex, **Then** a deterministic tie-break is used (identity_hash parity) and is stable across runs.
-3. **Given** insufficient natal data to compute polarity score (missing required planet signs), **When** resolving sex in infer mode, **Then** the system MUST fail fast with a clear error OR fall back to `sex=None` according to config (must be specified and tested).
+3. **Given** insufficient natal data to compute polarity score (missing required planet signs), **When** resolving sex in infer mode, **Then** the system MUST fail fast with a clear error (fallback to `sex=None` or skip is not permitted).
 
 ---
 
@@ -67,12 +79,12 @@ As a maintainer, I want calibration guardrails and automated checks so that sex 
 ### Edge Cases
 
 - What happens when `sex_mode="explicit"` but `sex` is absent? (Must default to baseline / no effect.)
-- What happens when `sex_mode="infer"` but natal lacks some planet signs? (Configurable: fail-fast or no-effect; must be explicit.)
+- What happens when `sex_mode="infer"` but natal lacks some planet signs? (MUST fail-fast; fallback to sex=None or skip is not permitted.)
 - What happens when Sun altitude equals exactly 0 (horizon)? (Sect becomes `unknown`, `sect_score=0`.)
-- What happens when `E*strength*W32[i]` would push `params_final[i]` outside [0,1]? (Clamp01 must handle it deterministically.)
+- What happens when `E*sex_strength*W32[i]` would push `params_final[i]` outside [0,1]? (Clamp01 must handle it deterministically.)
 - What happens when clamp saturation breaks perfect symmetry? (Expected; tests should allow it.)
 - What happens when dates/timezones are ambiguous in natal? (Spec 008 does not change natal parsing rules; uses existing natal outputs.)
-- What happens when `birth_data.sex` is an invalid value (e.g. typo, empty string, wrong type)? (MUST either fail-fast or be treated as `None`; implementation MUST document which. See FR-001.)
+- What happens when `birth_data.sex` is an invalid value (e.g. typo, empty string, wrong type)? (MUST fail-fast with an explicit error; implementation MUST document error type and message. See FR-001.)
 
 ---
 
@@ -81,7 +93,7 @@ As a maintainer, I want calibration guardrails and automated checks so that sex 
 ### Functional Requirements
 
 #### Sex field and modes
-- **FR-001**: System MUST support `sex ∈ {"male","female"}` and allow `None` for backward compatibility. Any other value (typo, empty string, wrong type) MUST be rejected: either fail-fast with a clear error or be treated as `None`; the implementation MUST document which behavior is used.
+- **FR-001**: System MUST support `sex ∈ {"male","female"}` and allow `None` for backward compatibility. Any other value (typo, empty string, wrong type) MUST cause **fail-fast**: the system MUST raise an explicit error (e.g. `ValueError` or domain-specific). The implementation MUST document the error type and message.
 - **FR-002**: System MUST support `sex_mode ∈ {"explicit","infer"}` with default `"explicit"`.
 - **FR-003**: In `"explicit"` mode, if `sex` is not provided, system MUST produce `E=0` and `sex_delta_32=0` (no behavioral change).
 - **FR-004**: In `"infer"` mode, if `sex` is not provided, system MUST infer sex deterministically using the algorithm in **FR-010..FR-015**.
@@ -113,25 +125,39 @@ As a maintainer, I want calibration guardrails and automated checks so that sex 
   - if `S < -T` => sex=female
   - else => tie-break
 - **FR-015**: Tie-break MUST be deterministic, default: `identity_hash_parity`:
-  - `male` if the low bit of a **deterministic** hash of `identity_hash` is 1, else `female`. The hash function MUST be stable across process runs (e.g. SHA-256); not Python’s built-in `hash()`. Source of `identity_hash` and exact algorithm: [data-model.md](data-model.md).
+  - `male` if the low bit of a **deterministic** hash of `identity_hash` is 1, else `female`. The hash function MUST be stable across process runs (e.g. xxhash per project rules); not Python’s built-in `hash()`. Source of `identity_hash` and exact algorithm: [data-model.md](data-model.md).
 
 #### Infer mode: insufficient natal data
 
-When natal data are insufficient to compute `sign_polarity_score` (e.g. no planets with known sign, or required planets missing), behavior in infer mode MUST be configurable and explicit:
+When natal data are insufficient to compute `sign_polarity_score` (e.g. no planets with known sign, or required planets missing), behavior in infer mode MUST be explicit: fail-fast only.
 
-- **Config option**: Implementation MUST support a setting such as **`infer_on_insufficient_data`** (or equivalent) with values **`"fail"`** (fail-fast with a clear error) or **`"none"`** (fall back to `sex=None`). Default MUST be documented (recommended: `"fail"` for reproducibility).
+- **Insufficient data**: When natal data are insufficient to compute sign_polarity_score (e.g. no planets with known sign), the system MUST **fail-fast** with an explicit error. **Fallback to `sex=None` or any form of “skip sex” is not permitted**, even as an optional mode.
 - **Required for inference**: At least **Sun** MUST have a known sign to compute a valid polarity score for inference; implementations MAY require more planets and MUST document the minimal set. See [data-model.md](data-model.md).
-- **Output when fallback to `sex=None`**: When fallback is used, `Agent.step()` output MUST report `sex=None` and MUST NOT apply sex_delta_32 (E=0). Optionally the output MAY include a flag such as `sex_inference_skipped: true` for logging; if present, it MUST be documented.
 
 #### 32D shifts (sex_delta_32)
 - **FR-016**: System MUST define a versioned `W32` profile (default `v1`) mapping E to 32D deltas.
-- **FR-017**: System MUST compute `sex_delta[i] = clamp(strength * E * W32[i], -max_param_delta, +max_param_delta)` with defaults `strength=0.03`, `max_param_delta=0.04`.
+- **FR-017**: System MUST compute `sex_delta[i] = clamp(sex_strength * E * W32[i], -sex_max_param_delta, +sex_max_param_delta)` with default **sex_strength = 0.03** and **sex_max_param_delta = 0.04**. These defaults are deterministic and versioned; config MAY override.
 - **FR-018**: System MUST apply `sex_delta_32` when assembling **identity** (base_vector). Sex is given at birth and is part of identity; therefore `sex_delta_32` is applied **before** transit application. Concretely: `base_vector` (or the identity-level 32D state supplied to BehavioralCore) MUST already include `sex_delta_32`; then `apply_transits(transit_state)` adds the transit delta on top. Final per-step clamp to [0,1] remains after all deltas.
 - **FR-019**: System MUST clamp final parameters to [0,1] deterministically.
 
+#### Bounds (32D) — deterministic
+
+The following bounds MUST hold for the default profile (sex_strength=0.03, sex_max_param_delta=0.04, |E|≤1, |W32[i]|≤1). Tests (e.g. US1 Scenario 2) MAY assert them.
+
+- **BOUND-32-1**: ∀i: |sex_delta[i]| ≤ sex_max_param_delta (default 0.04). Follows from the clamp in FR-017.
+- **BOUND-32-2**: L1(sex_delta) ≤ 32 × sex_max_param_delta = 1.28 (theoretical maximum; useful for sanity checks).
+- **BOUND-32-3**: L∞(sex_delta) ≤ sex_max_param_delta (0.04).
+- **BOUND-AXIS-1**: ∀k: |axis_final_sex[k] − axis_final_baseline[k]| ≤ sex_max_param_delta. Because each axis is the mean of 4 parameters and each parameter delta is bounded by sex_max_param_delta, the axis-level shift cannot exceed it (before clamp01).
+- **BOUND-VEC-1**: mean(|sex_delta|) ≤ sex_strength when |E|≤1 and |W32[i]|≤1. Always satisfied by construction; testable.
+
+Population-level guardrails (e.g. mean axis difference, overlap) remain in calibration (SC-004).
+
+**Defaults**: The pair (sex_strength=0.03, sex_max_param_delta=0.04) is the default for calibration. A stricter pair (e.g. sex_strength=0.02, sex_max_param_delta=0.03) MAY be used for a lighter effect; implementations MAY expose these as config.
+
 #### Output / observability
-- **FR-020**: `Agent.step()` output MUST include `sex` and `sex_polarity_E` (E).
+- **FR-020**: `Agent.step()` output MUST include `sex` and `sex_polarity_E` (E). The form of output is implementation-defined but MUST be a **return value** or a **dedicated output object** (e.g. a result or state object exposed after the step); callers MUST be able to read `sex` and `sex_polarity_E` without parsing logs.
 - **FR-021**: In debug/research output mode, the system SHOULD also include `sign_polarity_score`, `sect`, `sect_score`, and `sex_delta_32`.
+- **FR-021a (Privacy / logging)**: By default the system MUST NOT log `sex`, `birth_data`, or derived identifiers (e.g. E, identity_hash) in plain form. If an audit or debug mode logs such data, it MUST be opt-in and the implementation MUST document how to enable it and what is logged.
 
 #### 32D schema alignment
 
@@ -185,7 +211,7 @@ Sex is given at birth and belongs to **identity**; the 32D pipeline MUST apply s
 ### Data locations
 
 - **`birth_data.sex`**: Optional `"male" | "female"`. **Внешний вход**: пол личности передаётся в систему вместе с датой рождения и не выводится внутри. Явный источник пола при передаче — см. [data-model.md](data-model.md).
-- **`sex_mode`**: `"explicit" | "infer"`, default `"explicit"`. May live on `birth_data`, agent config, or a dedicated sex config; the implementation MUST document where it is read. See [data-model.md](data-model.md).
+- **`sex_mode`**: `"explicit" | "infer"`, default `"explicit"`. **Resolution order MUST be: `birth_data.sex_mode` first; if absent, then agent (or replay) config.** Implementation MUST document the full order. See [data-model.md](data-model.md).
 - **`identity_hash`**: Used for deterministic tie-break in infer mode (FR-015). Source MUST be a value that is part of identity and stable for the same agent (e.g. derived from `birth_data` or from `identity_config`). Exact field and derivation are defined in [data-model.md](data-model.md); implementations MUST use the same source for tie-break and for step output so that determinism holds.
 
 ### Pipeline order (006 step vs 008)
@@ -203,7 +229,7 @@ Thus **sex_delta_32 is applied before transit**; it is fixed at identity level a
 
 - **SC-001**: Determinism — for fixed inputs (natal, config, date, identity_hash), repeated `Agent.step()` runs produce identical outputs.
 - **SC-002**: Symmetry — for same natal/date, `sex_delta_32(male) ≈ -sex_delta_32(female)` (differences only due to clamp01 saturation).
-- **SC-003**: Bounds — `params_final` always lies in [0,1], and `max(|sex_delta[i]|) <= max_param_delta`.
+- **SC-003**: Bounds — `params_final` always lies in [0,1], and BOUND-32-1 / BOUND-32-3 hold: max(|sex_delta[i]|) ≤ sex_max_param_delta (default 0.04); axis-level shift per BOUND-AXIS-1.
 - **SC-004**: Calibration sanity (balanced sexes, N=10k natals):
   - For each axis k: `|mean(axis_male - axis_female)| <= 0.01`
   - `p95(|axis_male - axis_female|) <= 0.10`
@@ -213,7 +239,7 @@ Thus **sex_delta_32 is applied before transit**; it is fixed at identity level a
 
 ## Calibration (source, metrics, CI)
 
-- **Data source**: Calibration checks MUST use a well-defined dataset: either a **fixed regression dataset** committed in the repo (e.g. a fixed list of natals with assigned sex and expected bounds) or a **deterministic synthetic population** (fixed seed, N natals, 50/50 sex assignment). The implementation MUST document which source is used and where it is stored (path or artifact).
+- **Data source**: Calibration checks MUST use a well-defined dataset. **Recommended**: a **deterministic synthetic population** (fixed seed, N natals, 50/50 sex assignment); fixed dataset committed in the repo is optional. The implementation MUST document which source is used and where it is stored (e.g. seed value, or path to artifact).
 - **Overlap criterion**: “Distributions overlap substantially” MUST be made testable. Recommended formal criterion: for each axis, **Cohen’s d** (male vs female) MUST be below a threshold (e.g. 0.2), and/or **overlap coefficient** (or equivalent) MUST be above a threshold (e.g. 0.9). Exact thresholds and formula MUST be documented in the calibration script or config.
 - **CI**: When `sex_strength` or W32 is changed, CI MUST run the calibration sanity check (e.g. a script that loads the fixed dataset, runs step for each natal, computes mean diff, p95, and overlap metric, and fails if any threshold is violated). The script and its invocation (e.g. in GitHub Actions) MUST be documented; the dataset or seed MUST be fixed so that runs are reproducible.
 
@@ -232,11 +258,12 @@ Thus **sex_delta_32 is applied before transit**; it is fixed at identity level a
 - Inference MUST be opt-in. Default behavior MUST preserve baseline for legacy data (no silent physics changes).
 - All tie-breaks MUST be deterministic (no RNG).
 - All weights and constants MUST be versioned and auditable (W32 profile names).
+- **Logging**: By default do not log sex or birth_data in plain form; any opt-in audit/debug logging of sensitive fields MUST be documented.
 
 ---
 
 ## References
 
-- **Data model (008)**: [data-model.md](data-model.md) — `birth_data.sex`, `sex_mode`, source of `identity_hash`, infer_on_insufficient_data, sex source priority, pipeline summary.
+- **Data model (008)**: [data-model.md](data-model.md) — `birth_data.sex`, `sex_mode`, source of `identity_hash`, insufficient-data behaviour (fail-only), sex source priority, pipeline summary.
 - **006 (layered agent)**: [../006-layered-agent-architecture/spec.md](../006-layered-agent-architecture/spec.md) — Agent, BehavioralCore, identity_config, step order.
 - **002 (32D schema)**: [../002-hierarchical-personality-model/spec.md](../002-hierarchical-personality-model/spec.md) — 8 axes × 4 parameters, canonical parameter order for W32 alignment.
