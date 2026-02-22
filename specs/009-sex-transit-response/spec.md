@@ -9,9 +9,26 @@
 
 ---
 
+## Clarifications
+
+### Session 2026-02-22
+
+- Q: When both Agent config and ReplayConfig provide 009 fields (sex_transit_mode, beta, mcap, Wdyn_profile), which wins? → A: Agent config wins over ReplayConfig when both set 009 fields (single source of truth at Agent level).
+- Q: How is "debug output" for 009 (E, multiplier_stats, etc.) enabled? → A: Reuse 008 debug/audit mode: when 008 debug is on, 009 debug fields are included; no separate 009 flag.
+- Q: If sex_transit_mode is invalid (typo, empty, unknown value), should the system fail or fall back to "off"? → A: Fail-fast: invalid sex_transit_mode MUST raise an explicit error; implementation MUST document the error type and message.
+- Q: Should SC-004 "overlap substantially" be defined formally for 009? → A: Yes: 009 MUST use the same formal overlap criterion as 008 (e.g. Cohen's d, overlap coefficient); reference 008 and document thresholds in calibration script/config.
+- Q: If sex_transit_Wdyn_profile is unknown or invalid (e.g. typo, "v2" not implemented), fail or fall back to v1? → A: Fail-fast: unknown or invalid Wdyn_profile MUST raise an explicit error; implementation MUST document the error type and message.
+
+---
+
 ## Summary
 
-008 applies sex as a **static** shift to identity (`base_vector`). 009 adds **dynamic** modulation of the **transit response**: with `sex_transit_mode="scale_delta"`, the transit delta vector is scaled per-parameter by multipliers derived from `E` and a versioned weight profile, so that `d_*` (axis deltas over time) differ between male and female for the same natal and date range, while remaining bounded and deterministic. Default mode is `"off"` so production behavior is unchanged unless opted in.
+008 applies sex as a **static** shift to identity at birth (`base_vector`). 009 adds **dynamic** modulation of the **transit response** so that sex affects the personality **over the whole span of life**, not only in the natal chart: with `sex_transit_mode="scale_delta"`, the transit delta vector is scaled per-parameter by multipliers derived from `E` and a versioned weight profile. As a result, **transit-driven deltas (d_*) at every step of life** differ between male and female for the same natal and date range — the "vital" deltas along the life trajectory are sex-dependent. Identity Core (008) remains a single immutable snapshot at birth; 009 makes the **ongoing response to transits** (and thus the life-long expression of personality) depend on sex, while remaining bounded and deterministic. Default mode is `"off"` so production behavior is unchanged unless opted in.
+
+### Identity expression over the life span
+
+- **Натальная идентичность (008)**: пол задаёт статический сдвиг в `base_vector` при рождении — один раз.
+- **Идентичность на протяжённости жизни (009)**: пол также задаёт **модуляцию ответа на транзиты** на каждом шаге жизни. Транзитные дельты (и получающиеся из них `d_*`) — это то, как личность реагирует на время; 009 делает эту реакцию зависящей от пола **на всей протяжённости жизни**, а не только в натале. Итог: траектория личности (натал + все жизненные дельты) различается по полу и по рождению, и по отклику на транзиты день за днём.
 
 ---
 
@@ -50,8 +67,8 @@ As a researcher, I want to log enough decomposition to explain why `d_*` differs
 **Independent Test**: Ensure debug/research output includes required fields and stays deterministic.
 
 **Acceptance Scenarios**:
-1. **Given** debug output enabled, **When** `Agent.step()` runs, **Then** output includes `E`, `sex_transit_multiplier_stats`, and (optionally) `transit_delta_eff` summaries.
-2. **Given** debug output disabled, **When** `Agent.step()` runs, **Then** output remains minimal and stable (no perf regressions).
+1. **Given** 008 debug/audit mode is enabled, **When** `Agent.step()` runs with 009 enabled, **Then** output includes `E`, `sex_transit_multiplier_stats`, and (optionally) `transit_delta_eff` summaries.
+2. **Given** 008 debug/audit mode is disabled, **When** `Agent.step()` runs, **Then** output remains minimal and stable (no perf regressions); no separate 009 debug flag exists.
 
 ---
 
@@ -62,6 +79,8 @@ As a researcher, I want to log enough decomposition to explain why `d_*` differs
 - Missing sex / `E=0`: modulation MUST be disabled (identity multipliers `M[i]=1`).
 - Modulation MUST NOT flip signs unexpectedly: default design only scales magnitudes (multipliers around 1).
 - If `sex_transit_mode="off"`, the pipeline MUST behave exactly as before 009 (no modulation layer).
+- If `sex_transit_mode` is invalid (typo, empty, or not in the allowed set), the system MUST fail-fast with an explicit error; fallback to `"off"` is not permitted.
+- If `sex_transit_Wdyn_profile` is unknown or invalid (e.g. typo, unregistered version), the system MUST fail-fast with an explicit error; fallback to `"v1"` is not permitted.
 
 ---
 
@@ -70,8 +89,9 @@ As a researcher, I want to log enough decomposition to explain why `d_*` differs
 ### Functional Requirements
 
 #### Mode & toggles
-- **FR-001**: System MUST introduce `sex_transit_mode ∈ {'off', 'scale_delta', 'scale_sensitivity'}` with default `"off"`.
+- **FR-001**: System MUST introduce `sex_transit_mode ∈ {'off', 'scale_delta', 'scale_sensitivity'}` with default `"off"`. Any other value (typo, empty string, unknown) MUST cause **fail-fast**: the system MUST raise an explicit error (e.g. `ValueError` or domain-specific). The implementation MUST document the error type and message.
 - **FR-002**: With `sex_transit_mode="off"`, the system MUST match baseline behavior (no change to transit response; 008 static base_vector shift still applies).
+- **FR-002a**: When both Agent config and ReplayConfig provide 009-related fields, Agent config MUST take precedence; implementation MUST document the resolution order.
 - **FR-003**: Sex transit modulation MUST use `E` computed in **008** (sex polarity scalar from identity).
 
 #### Modulation strategy (default: scale transit delta)
@@ -90,7 +110,7 @@ As a researcher, I want to log enough decomposition to explain why `d_*` differs
   - `mcap` caps deviation from 1 (default **0.10**, i.e. multipliers in [0.9, 1.1])
   - `Wdyn[i] ∈ [-1, +1]` is a versioned weight profile (default: reuse **W32_v1** from spec 008)
 
-- **FR-012**: `Wdyn` MUST be versioned (e.g. `sex_transit_Wdyn_profile="v1"`), auditable, and deterministic. Parameter order MUST match the canonical 32D order (spec 002, 8 axes × 4 sub-parameters).
+- **FR-012**: `Wdyn` MUST be versioned (e.g. `sex_transit_Wdyn_profile="v1"`), auditable, and deterministic. Parameter order MUST match the canonical 32D order (spec 002, 8 axes × 4 sub-parameters). An unknown or invalid profile value (typo, unregistered version) MUST cause **fail-fast**: the system MUST raise an explicit error; implementation MUST document the error type and message.
 - **FR-013**: If `E=0` or `sex=None`, the system MUST use identity multipliers `M[i]=1` (no modulation).
 
 #### Alternative strategy (optional): scale sensitivity
@@ -109,11 +129,7 @@ As a researcher, I want to log enough decomposition to explain why `d_*` differs
 
 #### Output / debug fields
 - **FR-040**: `Agent.step()` output MUST remain backward compatible in default mode (`sex_transit_mode="off"`).
-- **FR-041**: With debug enabled, output SHOULD include:
-  - `sex`, `E`
-  - `sex_transit_mode`, `beta`, `mcap`, `Wdyn_profile`
-  - `multiplier_stats`: `min_M`, `max_M`, `mean_abs(M-1)`
-  - (optional) `max_abs(transit_delta)`, `max_abs(transit_delta_eff)`
+- **FR-041**: Debug output for 009 reuses **008 opt-in debug/audit mode**: when that mode is enabled, step output SHOULD also include 009-related fields: `sex`, `E`, `sex_transit_mode`, `beta`, `mcap`, `Wdyn_profile`, `multiplier_stats` (min_M, max_M, mean_abs(M-1)), and optionally `max_abs(transit_delta)`, `max_abs(transit_delta_eff)`. There is no separate 009-specific debug flag.
 
 ---
 
@@ -136,7 +152,7 @@ Modulation MUST NOT change the contract of `TransitEngine` or the meaning of `bo
 
 ### Data locations
 
-- **Config**: `sex_transit_mode`, `beta`, `mcap`, `sex_transit_Wdyn_profile` (e.g. on ReplayConfig or Agent config). Defaults: `off`, 0.05, 0.10, `"v1"`.
+- **Config**: `sex_transit_mode`, `beta`, `mcap`, `sex_transit_Wdyn_profile` may appear on ReplayConfig or Agent config. **Resolution order**: when both provide 009 fields, **Agent config wins** over ReplayConfig (single source of truth at Agent level). Defaults: `off`, 0.05, 0.10, `"v1"`. Implementation MUST document the full resolution order.
 - **Identity**: `E` (and optionally `sex`) from 008 identity_config; no new identity fields required.
 
 ---
@@ -154,7 +170,7 @@ Modulation MUST NOT change the contract of `TransitEngine` or the meaning of `bo
 - **SC-004 Calibration guardrails** (balanced sexes, N≥10k natals, fixed date range):
   - For each axis k: `|mean(d_axis_k(male) - d_axis_k(female))| ≤ 0.01`
   - For each axis k: `p95(|d_axis_k(male) - d_axis_k(female)|) ≤ 0.05`
-  - Distributions overlap substantially (no near-separation).
+  - **Overlap**: The same formal criterion as in 008 MUST be used: for each axis, Cohen's d (male vs female) MUST be below a documented threshold (e.g. 0.2), and/or overlap coefficient MUST be above a documented threshold (e.g. 0.9). Exact thresholds and formula MUST be documented in the calibration script or config; see [008 Calibration](../008-sex-polarity-32d-shifts/spec.md#calibration-source-metrics-ci).
 
 > Notes: Thresholds are tighter than 008 because `d_*` values are typically smaller than absolute axis values. Thresholds MAY be made configurable for calibration scripts.
 
@@ -166,7 +182,18 @@ Modulation MUST NOT change the contract of `TransitEngine` or the meaning of `bo
 - Multipliers MUST be deterministic; no RNG.
 - Prefer reusing W32 profile for Wdyn v1 to reduce degrees of freedom; later you can split if needed.
 - Logging should be optional and lightweight: record multiplier stats, not full vectors unless explicitly enabled.
-- **Privacy**: Same as 008 — by default do not log sex, E, or identity in plain form; opt-in debug only and documented.
+- **Privacy**: Same as 008 — by default do not log sex, E, or identity in plain form; opt-in debug only and documented. 009 debug fields are exposed only when 008 debug/audit mode is enabled (no separate 009 flag).
+- **Calibration overlap**: SC-004 overlap criterion MUST follow 008 (Cohen's d, overlap coefficient); calibration script or config MUST document the chosen thresholds.
+
+---
+
+## Constitution Compliance
+
+Per project constitution §8.3, this feature specification includes:
+
+- **Deterministic Mode compliance**: 009 uses no RNG; multipliers M[i] are computed deterministically from E and Wdyn. Same (natal, config, date, identity_hash) → same step() output. Verified in [plan.md](plan.md) Constitution Check and in tasks (T009 determinism test, T017).
+- **Identity/Core separation validation**: 008 base_vector and E remain immutable at birth; 009 modulates only the **transit path** at each step (bounded_delta → bounded_delta_eff before assemble_state). Identity *expression* over the life span is sex-dependent; the Core snapshot is unchanged. Verified in plan Constitution Check and T017.
+- **Logging validation**: 009 debug fields (multiplier_stats, etc.) are exposed only when 008 opt-in debug/audit mode is enabled; no plain logging of sex, E, or identity by default. Verified in plan and T017.
 
 ---
 
