@@ -285,7 +285,7 @@ uranus_opposition:
 - **FR-199a**: `Agent.step()` MUST accept an optional argument `memory_delta: tuple[float, ...] | None = None`. When provided, it is passed through to the behavior assembly (together with transit effect and `age_delta_32`). When omitted, memory_delta is treated as zeros.
 - **FR-200**: Introduce `AgeEngine` that outputs:
   - `age_years`
-  - `age_stage_features_v1`
+  - `age_stage_features` (tuple of 5 values; v1: maturity, saturn_event, jupiter_return, nodal_return, uranus_opposition)
   - `age_delta_32`
 - **FR-201**: In the behavior assembly pipeline, add `age_delta_32` as an additive modifier alongside memory/sex modifiers:
 
