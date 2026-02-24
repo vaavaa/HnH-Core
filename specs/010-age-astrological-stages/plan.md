@@ -38,7 +38,7 @@
 ### 1. Константы и конфиг
 
 - **Константы периодов** (v1): TROPICAL_YEAR_DAYS=365.2425, SATURN_PERIOD_YEARS=29.50, JUPITER_PERIOD_YEARS=11.86, URANUS_PERIOD_YEARS=84.00, NODE_PERIOD_YEARS=18.60 — в `hnh/age/constants.py` или внутри модуля stage_features.
-- **AgeConfig**: dataclass (frozen или обычный) в `hnh/config/age_config.py`: age_mode, age_strength, age_max_param_delta, age_daily_lipschitz, age_profile, age_max_years с дефолтами из спеки. **Валидация (spec Clarifications)**: age_mode in ("off", "on") — при неизвестном fail-fast; недопустимые значения числовых полей (например отрицательные, ноль где запрещено, вне допустимых диапазонов) MUST вызывать fail-fast при использовании конфига; реализация MUST документировать допустимые диапазоны и тип/сообщение ошибки.
+- **AgeConfig**: dataclass (frozen или обычный) в `hnh/config/age_config.py`: age_mode, age_strength, age_max_param_delta, age_daily_lipschitz, age_profile, age_max_years с дефолтами из спеки. **Валидация (spec Clarifications)**: age_mode in ("off", "on") — при неизвестном fail-fast; недопустимые значения числовых полей MUST вызывать fail-fast при использовании конфига; реализация MUST документировать допустимые диапазоны и тип/сообщение ошибки. **Пример допустимых диапазонов** для документации (реализация может сужать): age_strength ∈ (0, 0.2], age_max_param_delta ∈ (0, 0.2], age_daily_lipschitz ≥ 0, age_max_years > 0.
 
 ### 2. Stage features (v1)
 
@@ -52,7 +52,7 @@
 ### 4. AgeEngine
 
 - **Модуль** `hnh/age/engine.py`: класс `AgeEngine(config: AgeConfig)`. Состояние: `_last_age_delta_32: tuple[float, ...] | None`, обновляется после каждого `compute`.
-- **Метод** `compute(...) -> AgeOutput`: delta_days → age_years (clamp); age_stage_features_v1(age_years); raw_delta_32 = compute_age_delta_32(...); при первом вызове (_last_age_delta_32 is None) вернуть raw_delta_32 как age_delta_32 и сохранить в _last_age_delta_32; иначе age_delta_32 = apply_daily_lipschitz(_last_age_delta_32, raw_delta_32, config.age_daily_lipschitz), обновить _last_age_delta_32; вернуть AgeOutput(age_years, age_stage_features, age_delta_32 [, stats]).
+- **Метод** `compute(...) -> AgeOutput`: delta_days → age_years (clamp); age_stage_features_v1(age_years) → вектор из 5 значений; raw_delta_32 = compute_age_delta_32(...); при первом вызове (_last_age_delta_32 is None) вернуть raw_delta_32 как age_delta_32 и сохранить в _last_age_delta_32; иначе age_delta_32 = apply_daily_lipschitz(...), обновить _last_age_delta_32; вернуть AgeOutput(age_years, age_stage_features, age_delta_32 [, stats]). Выходное поле **age_stage_features** — тот же вектор (каноническое имя в API и выводе step()).
 - **Отсутствие birth_datetime_utc** (spec Clarifications): при age_mode=on и невозможности получить birth_datetime_utc из birth_data — **fail-fast**: MUST выбросить явную ошибку (e.g. ValueError); реализация MUST документировать тип и сообщение ошибки.
 
 ### 5. Интеграция в assemble_state и BehavioralCore
@@ -73,7 +73,7 @@
 
 ### 8. Тесты
 
-- **Unit**: age_years от двух дат (Δt/365.2425, clamp); bump, sigmoid; все 5 признаков на фиксированных возрастах; compute_age_delta_32 (границы, нулевые признаки); apply_daily_lipschitz (ограничение шага per call); невалидный AgeConfig → fail-fast; при age_mode=on и отсутствии birth_datetime_utc → fail-fast (документированный тип ошибки).
+- **Unit**: age_years от двух дат (Δt/365.2425, clamp); bump, sigmoid; все 5 признаков на фиксированных возрастах; **пики стадий (Success 4)**: saturn_event локально макс. в возрастах 0, ~7.4, ~14.75, ~22.1 y, uranus_opposition — near ~42 y (окно e.g. ±2 y); compute_age_delta_32 (границы, нулевые признаки); apply_daily_lipschitz (ограничение шага per call); невалидный AgeConfig → fail-fast; при age_mode=on и отсутствии birth_datetime_utc → fail-fast (документированный тип ошибки).
 - **Integration**: Agent.step() с age_mode=on/off; с memory_delta и без; один и тот же натал/даты — два прогона, одинаковые хеши; сравнение params_final с age 20 vs 40 при том же натале; проверка max_abs(age_delta_32) <= age_max_param_delta; run_step_v2 с memory_delta делегирует в Agent.step(memory_delta=...) и результат совпадает с ожидаемой сборкой; при debug и age_mode=on объект, возвращаемый step(), содержит age_years, age_stage_features, age_delta_32_stats.
 
 ---
@@ -104,5 +104,7 @@ specs/010-age-astrological-stages/
 ```
 
 Tests: `tests/unit/test_010_*.py`, `tests/integration/test_010_*.py` (по плану выше).
+
+**Success Criterion 4 (calibratable stage signals)**: «near» для пиков (US3) в v1 задаётся детерминированными возрастами по константам: Saturn — 0, ~7.375, ~14.75, ~22.125 y (четверти 29.5y); Uranus opposition — ~42 y. Допустимое окно для проверки «пик рядом»: например ±2 y для opposition, ±1.5 y для return; точные пороги может задать реализация или калибровочный тест. Обязательный unit-тест должен проверять, что значения признаков в этих возрастах локально максимальны (или выше порога).
 
 **Success Criterion 5 (population guardrails)**: по Clarifications автоматический скрипт/CI для проверки порогов (N≥10k, mean shift, adjacent slices) **не обязателен** в рамках 010; пороги остаются целевыми для калибровки и ручной или будущей автоматической проверки.

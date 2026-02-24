@@ -24,7 +24,7 @@
 
 **Checkpoint**: AgeConfig and stage feature functions ready
 
-- [ ] T002 Add AgeConfig in hnh/config/age_config.py: age_mode, age_strength, age_max_param_delta, age_daily_lipschitz, age_profile, age_max_years with spec defaults; age_mode in ("off", "on") else fail-fast; invalid numeric values (e.g. negative, zero where forbidden, out of valid range) MUST raise explicit error when config is used — document valid ranges and error type/message (spec Clarifications)
+- [ ] T002 Add AgeConfig in hnh/config/age_config.py: age_mode, age_strength, age_max_param_delta, age_daily_lipschitz, age_profile, age_max_years with spec defaults; age_mode in ("off", "on") else fail-fast; invalid numeric values MUST raise explicit error when config is used — document valid ranges (e.g. per plan: age_strength ∈ (0, 0.2], age_max_param_delta ∈ (0, 0.2], age_daily_lipschitz ≥ 0, age_max_years > 0) and error type/message (spec Clarifications)
 - [ ] T002b [P] Unit test: invalid AgeConfig (unknown age_mode, negative/out-of-range numeric values) raises documented error in tests/unit/test_010_age_config.py
 - [ ] T003 [P] Add period constants (TROPICAL_YEAR_DAYS, SATURN_PERIOD_YEARS, JUPITER_PERIOD_YEARS, URANUS_PERIOD_YEARS, NODE_PERIOD_YEARS) in hnh/age/constants.py or hnh/age/stage_features.py
 - [ ] T004 [P] Implement bump(age, center, width), sigmoid(x), age_years_from_delta_days(delta_days, age_max_years) in hnh/age/stage_features.py
@@ -38,7 +38,7 @@
 
 - [ ] T006 Implement W_age v1 matrix (5×32) per spec and compute_age_delta_32(features, age_strength, age_max_param_delta) in hnh/age/delta_32.py; per-parameter clamp
 - [ ] T007 Implement apply_daily_lipschitz(prev_delta_32, raw_delta_32, L) in hnh/age/delta_32.py or hnh/age/engine.py
-- [ ] T008 [P] Unit tests: age_years from two datetimes, bump/sigmoid, all 5 stage features at fixed ages, compute_age_delta_32 bounds, apply_daily_lipschitz cap (per call, not scaled by days) in tests/unit/test_010_stage_features.py and tests/unit/test_010_delta_32.py
+- [ ] T008 [P] Unit tests: age_years from two datetimes, bump/sigmoid, all 5 stage features (age_stage_features) at fixed ages, **stage peaks (Success 4)**: saturn_event local max at 0, ~7.4, ~14.75, ~22.1 y, uranus_opposition peak near 42 y (e.g. ±2 y window per plan), compute_age_delta_32 bounds, apply_daily_lipschitz cap (per call, not scaled by days) in tests/unit/test_010_stage_features.py and tests/unit/test_010_delta_32.py
 
 ---
 
@@ -46,7 +46,7 @@
 
 **Checkpoint**: AgeEngine.compute() returns AgeOutput; state for Lipschitz
 
-- [ ] T009 Implement AgeEngine(config) and compute(birth_datetime_utc, injected_time_utc) -> AgeOutput in hnh/age/engine.py; use stage_features_v1, compute_age_delta_32, apply_daily_lipschitz; update _last_age_delta_32
+- [ ] T009 Implement AgeEngine(config) and compute(birth_datetime_utc, injected_time_utc) -> AgeOutput in hnh/age/engine.py; use age_stage_features_v1 (output field age_stage_features), compute_age_delta_32, apply_daily_lipschitz; update _last_age_delta_32
 - [ ] T010 When birth_datetime_utc is missing and age_engine present (age_mode=on): MUST raise explicit error (fail-fast); document error type and message in engine or Agent (spec Clarifications)
 - [ ] T011 [P] Unit test: AgeEngine.compute determinism and output shape; when birth_datetime_utc missing and age_mode=on, Agent or engine raises documented error in tests/unit/test_010_engine.py
 
@@ -70,7 +70,7 @@
 
 **Checkpoint**: Debug output includes age fields when debug=True
 
-- [ ] T017 [US4] When debug=True and age_engine used, add age_years, age_stage_features, age_delta_32_stats to the **object returned by step()** (e.g. extend StepResult), not a separate debug container (spec Clarifications) in hnh/agent.py
+- [ ] T017 [US4] When debug=True and age_engine used, add age_years, age_stage_features (5 values), age_delta_32_stats to the **object returned by step()** (e.g. extend StepResult), not a separate debug container (spec Clarifications) in hnh/agent.py
 - [ ] T018 [US4] Test: debug=True and age_mode=on → step() return object includes age_years, age_stage_features, age_delta_32_stats; debug=False → backward compatible in tests/unit/test_010_agent_debug.py or integration
 
 ---
@@ -78,5 +78,5 @@
 ## Phase 7: Replay hash and polish (US3 optional)
 
 - [ ] T019 Include age config fields (age_mode, age_strength, age_max_param_delta, age_daily_lipschitz, age_profile, age_max_years) in configuration_hash when age_mode=on in hnh/config/replay_config.py or equivalent
-- [ ] T020 [US3] Optional: script or test that saturn_event peaks near quarter-cycle landmarks and uranus_opposition near ~42y (calibration/interpretability) in scripts/010/ or tests/. Success Criterion 5 (population guardrails): automated script/CI **not required** for 010 (calibration target only).
+- [ ] T020 [US3] Optional: script or test for calibration/interpretability (saturn_event at quarter-cycle ages, uranus_opposition near 42y) in scripts/010/ or tests/. Success Criterion 4 is already covered by mandatory peak test in T008; T020 is for broader calibration. Success Criterion 5 (population guardrails): automated script/CI **not required** for 010 (calibration target only).
 - [ ] T021 Constitution check: confirm determinism, no RNG, logging only when debug; note in plan.md or checklist
