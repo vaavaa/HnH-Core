@@ -78,14 +78,15 @@ def _run_step_v2_via_agent(
     config_hash: str,
     memory_signature: str,
     natal_positions: dict[str, Any],
+    memory_delta: tuple[float, ...] = (0.0,) * NUM_PARAMETERS,
 ) -> ReplayResult:
-    """Delegate to Agent.step() (Spec 006); build ReplayResult from agent state."""
+    """Delegate to Agent.step() (Spec 006, FR-199); build ReplayResult from agent state. Passes memory_delta to step."""
     from hnh.agent import Agent
     from hnh.lifecycle.engine import aggregate_axis
 
     birth_data = {"positions": natal_positions.get("positions", []), "aspects": natal_positions.get("aspects", [])}
     agent = Agent(birth_data, config=config, lifecycle=False, identity_config=identity)
-    agent.step(dt_utc)
+    agent.step(dt_utc, memory_delta=memory_delta)
     params_final = agent.behavior.current_vector
     axis_final = aggregate_axis(params_final)
     transit_state = agent.transits.state(dt_utc, config)
@@ -142,16 +143,16 @@ def run_step_v2(
     if len(memory_delta) != NUM_PARAMETERS:
         raise ValueError(f"memory_delta must have length {NUM_PARAMETERS}, got {len(memory_delta)}")
 
-    # Delegate to Agent.step() when simple path (no phase, no history, no memory delta)
+    # Delegate to Agent.step() when no phase/history (FR-199); non-zero memory_delta does NOT skip delegation
     use_agent = (
         transit_effect_phase_prev_by_category is None
         and (not transit_effect_history or len(transit_effect_history) == 0)
-        and all(x == 0.0 for x in memory_delta)
         and natal_positions is not None
     )
     if use_agent:
         return _run_step_v2_via_agent(
-            identity, config, dt_utc, injected_iso, config_hash, memory_signature, natal_positions
+            identity, config, dt_utc, injected_iso, config_hash, memory_signature, natal_positions,
+            memory_delta=memory_delta,
         )
 
     transit_data: dict[str, Any] | None = None

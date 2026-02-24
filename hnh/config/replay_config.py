@@ -6,6 +6,7 @@ xxhash of canonical serialization (orjson); replay-relevant fields only. Spec 00
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import orjson
 import xxhash
@@ -51,10 +52,12 @@ class ReplayConfig:
         return dict(self.parameter_max_delta)
 
 
-def compute_configuration_hash(config: ReplayConfig) -> str:
+def compute_configuration_hash(config: ReplayConfig, age_config: Any = None) -> str:
     """
     xxhash of replay-relevant fields only (canonical orjson). Spec 003.
-    When lifecycle_enabled (005), includes mode, initial_f, initial_w. Deterministic.
+    When lifecycle_enabled (005), includes mode, initial_f, initial_w.
+    When age_config and age_config.age_mode == "on" (010), includes age_mode, age_strength, age_max_param_delta,
+    age_daily_lipschitz, age_profile, age_max_years. Deterministic.
     """
     payload = {
         "global_max_delta": config.global_max_delta,
@@ -68,6 +71,13 @@ def compute_configuration_hash(config: ReplayConfig) -> str:
         payload["lifecycle_enabled"] = True
         payload["initial_f"] = getattr(config, "initial_f", 0.0)
         payload["initial_w"] = getattr(config, "initial_w", 0.0)
+    if age_config is not None and getattr(age_config, "age_mode", "off") == "on":
+        payload["age_mode"] = "on"
+        payload["age_strength"] = getattr(age_config, "age_strength", 0.04)
+        payload["age_max_param_delta"] = getattr(age_config, "age_max_param_delta", 0.06)
+        payload["age_daily_lipschitz"] = getattr(age_config, "age_daily_lipschitz", 0.001)
+        payload["age_profile"] = getattr(age_config, "age_profile", "v1")
+        payload["age_max_years"] = getattr(age_config, "age_max_years", 120.0)
     blob = orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)
     return xxhash.xxh3_128(blob, seed=0).hexdigest()
 

@@ -1,9 +1,8 @@
 """
-State assembly for 32-parameter model (Spec 002).
-final[p] = clamp01(base[p] + transit_effect[p] + memory_delta[p]).
-Default transit_effect = bounded_delta[p] × sensitivity[p]; optional precomputed (e.g. 0.7*daily + 0.3*phase).
-Noise floor: минимальный по модулю вклад транзита (детерминированный), чтобы оси не были нулевыми.
-Axis aggregation: axis_final = mean(final sub-parameters). Deterministic.
+State assembly for 32-parameter model (Spec 002). Spec 010: + age_delta_32.
+final[p] = clamp01(base[p] + transit_effect[p] + memory_delta[p] + age_delta_32[p]).
+Default transit_effect = bounded_delta[p] × sensitivity[p]; optional precomputed.
+Noise floor: минимальный по модулю вклад транзита. Axis aggregation: axis_final = mean(final sub-parameters).
 """
 
 from __future__ import annotations
@@ -25,18 +24,22 @@ def assemble_state(
     memory_delta: tuple[float, ...] | None = None,
     *,
     precomputed_transit_effect: tuple[float, ...] | None = None,
+    age_delta_32: tuple[float, ...] | None = None,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
     Compute params_final (32) and axis_final (8).
-    Formula: final[p] = clamp01(base[p] + transit_effect[p] + memory_delta[p]).
+    Formula: final[p] = clamp01(base[p] + transit_effect[p] + memory_delta[p] + age_delta_32[p]).
     transit_effect = precomputed_transit_effect if provided, else bounded_delta[p]*sensitivity_vector[p].
-    memory_delta default: zeros.
+    memory_delta / age_delta_32 default: zeros.
     """
     if len(base_vector) != NUM_PARAMETERS or len(sensitivity_vector) != NUM_PARAMETERS or len(bounded_delta) != NUM_PARAMETERS:
         raise ValueError(f"Vectors must have length {NUM_PARAMETERS}")
     mem = memory_delta if memory_delta is not None else (0.0,) * NUM_PARAMETERS
     if len(mem) != NUM_PARAMETERS:
         raise ValueError(f"memory_delta length must be {NUM_PARAMETERS}")
+    age_d = age_delta_32 if age_delta_32 is not None else (0.0,) * NUM_PARAMETERS
+    if len(age_d) != NUM_PARAMETERS:
+        raise ValueError(f"age_delta_32 length must be {NUM_PARAMETERS}")
     if precomputed_transit_effect is not None and len(precomputed_transit_effect) != NUM_PARAMETERS:
         raise ValueError(f"precomputed_transit_effect length must be {NUM_PARAMETERS}")
     use_precomputed = precomputed_transit_effect is not None
@@ -48,7 +51,7 @@ def assemble_state(
             transit = bounded_delta[p] * sensitivity_vector[p]
             if abs(transit) < NOISE_FLOOR:
                 transit = NOISE_FLOOR if (p % 2 == 0) else -NOISE_FLOOR
-        params_final[p] = clamp01(base_vector[p] + transit + mem[p])
+        params_final[p] = clamp01(base_vector[p] + transit + mem[p] + age_d[p])
     # Axis aggregation: ровно 4 параметра на ось
     axis_final = [0.0] * NUM_AXES
     for p_ix, (axis_ix, _) in enumerate(_PARAMETER_LIST):

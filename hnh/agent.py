@@ -3,6 +3,7 @@ Agent: single orchestrator (Spec 006). Composition: natal, behavior, transits, o
 step(date) order: (1) transit_state, (2) lifecycle update (resilience from current_vector), (3) behavior.apply_transits.
 Spec 008: birth_data.sex/sex_mode, identity includes sex_delta_32; step() output includes sex and sex_polarity_E.
 Spec 009: optional sex_transit_config; when sex_transit_mode=scale_delta, transit response at every step depends on sex.
+Spec 010: optional age_config; when age_mode=on, AgeEngine adds age_delta_32 to assembly; step() accepts memory_delta.
 FR-021a: By default do not log sex, birth_data, or derived identifiers; opt-in audit/debug mode must be documented.
 
 009 config resolution (FR-002a): When both Agent and ReplayConfig could provide 009 fields, Agent config wins.
@@ -12,7 +13,7 @@ Currently 009 fields live only on Agent (sex_transit_config). ReplayConfig is fr
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time, timezone
 from typing import Any
 
 from hnh.identity.schema import NUM_PARAMETERS
@@ -69,10 +70,13 @@ def _build_identity_config_from_natal(
 
 @dataclass
 class StepResult:
-    """FR-020: step() output includes sex and sex_polarity_E. FR-021: debug/research may extend with sign_polarity_score, sect, sect_score, sex_delta_32 (e.g. from identity_config). US3 (009): when 008 debug is on and 009 scale_delta active, debug_009 holds multiplier_stats etc."""
+    """FR-020: step() output includes sex and sex_polarity_E. FR-021: debug/research may extend. US3 (009): debug_009 when 009 scale_delta active. US4 (010): when debug and age_mode=on, age_years, age_stage_features, age_delta_32_stats on same object."""
     sex: str | None
     sex_polarity_E: float
     debug_009: dict[str, Any] | None = None
+    age_years: float | None = None
+    age_stage_features: tuple[float, ...] | None = None
+    age_delta_32_stats: dict[str, float] | None = None
 
 
 class Agent:
@@ -84,7 +88,7 @@ class Agent:
     __slots__ = (
         "natal", "behavior", "transits", "lifecycle",
         "_config", "_identity_config", "_zodiac", "_last_step_result",
-        "_sex_transit_config", "_debug",
+        "_sex_transit_config", "_debug", "_birth_data", "_age_engine",
     )
 
     def __init__(
@@ -94,14 +98,16 @@ class Agent:
         lifecycle: bool = False,
         identity_config: Any = None,
         sex_transit_config: Any = None,
+        age_config: Any = None,
         debug: bool = False,
     ) -> None:
         """
-        birth_data: per data-model §0 (variant A or B); may include sex, sex_mode (Spec 008).
+        birth_data: per data-model §0 (variant A or B); may include sex, sex_mode (Spec 008), datetime_utc (010).
         config: ReplayConfig for step(); default used if None.
         lifecycle: if True, create LifecycleEngine; else lifecycle=None (product mode).
         identity_config: protocol (base_vector, sensitivity_vector); if None, built from natal + birth_data.
         sex_transit_config: optional 009 config (SexTransitConfig). If None, sex_transit_mode is effectively "off".
+        age_config: optional 010 AgeConfig. If None or age_mode=off, no age engine. When age_mode=on, birth_data must include datetime_utc.
         debug: 008 audit/debug mode (FR-021a). When True, step() may include 009 debug_009 when 009 is active.
         Resolution order (FR-002a): Agent sex_transit_config wins over any 009 fields on config.
         """
@@ -113,6 +119,12 @@ class Agent:
         self._config = config if config is not None else _DEFAULT_CONFIG
         self._sex_transit_config = sex_transit_config
         self._debug = debug
+        self._birth_data = birth_data
+        if age_config is not None and getattr(age_config, "age_mode", "off") == "on":
+            from hnh.age.engine import AgeEngine
+            self._age_engine: Any = AgeEngine(age_config)
+        else:
+            self._age_engine = None
         # Validate 009 profile at build when mode != off (FR-012 fail-fast)
         if sex_transit_config is not None and getattr(sex_transit_config, "sex_transit_mode", "off") != "off":
             from hnh.sex.transit_modulator import get_wdyn_profile
@@ -134,16 +146,47 @@ class Agent:
         self._zodiac = None
         self._last_step_result: StepResult | None = None
 
-    def step(self, date_or_dt: date | datetime) -> StepResult:
+    def step(
+        self,
+        date_or_dt: date | datetime,
+        memory_delta: tuple[float, ...] | None = None,
+    ) -> StepResult:
         """
         Order: (1) transit_state = transits.state(date, config);
-               (2) resilience from behavior.current_vector (before apply_transits);
-               (3) if lifecycle: update_lifecycle(stress, resilience);
-               (4) 009 if enabled: scale bounded_delta by M, pass modified TransitState;
-               (5) behavior.apply_transits(transit_state).
-        Returns StepResult(sex, sex_polarity_E) per FR-020.
+               (2) 010 if age_engine: compute age_delta_32 (fail-fast if birth_datetime_utc missing);
+               (3) resilience from behavior.current_vector; (4) lifecycle if enabled;
+               (5) 009 if enabled: scale bounded_delta; (6) behavior.apply_transits(transit_state, memory_delta, age_delta_32).
+        Returns StepResult(sex, sex_polarity_E) per FR-020. FR-199a: memory_delta optional, passed to assembly.
         """
         from hnh.astrology.transit_state import TransitState
+
+        # Resolve injected_time_utc (010): date -> 00:00:00 UTC, datetime -> use as UTC
+        if isinstance(date_or_dt, date) and not isinstance(date_or_dt, datetime):
+            injected_time_utc = datetime.combine(date_or_dt, time.min, tzinfo=timezone.utc)
+        else:
+            dt = date_or_dt
+            injected_time_utc = dt if getattr(dt, "tzinfo", None) is not None else dt.replace(tzinfo=timezone.utc)
+
+        age_delta_32: tuple[float, ...] | None = None
+        step_age_years: float | None = None
+        step_age_stage_features: tuple[float, ...] | None = None
+        step_age_delta_32_stats: dict[str, float] | None = None
+        if self._age_engine is not None:
+            from hnh.age.engine import (
+                MISSING_BIRTH_DATETIME_UTC_MESSAGE,
+                get_birth_datetime_utc_from_birth_data,
+            )
+            birth_dt = get_birth_datetime_utc_from_birth_data(self._birth_data)
+            if birth_dt is None:
+                raise ValueError(MISSING_BIRTH_DATETIME_UTC_MESSAGE)
+            age_out = self._age_engine.compute(
+                birth_dt, injected_time_utc, include_stats=getattr(self, "_debug", False)
+            )
+            age_delta_32 = age_out.age_delta_32
+            if getattr(self, "_debug", False):
+                step_age_years = age_out.age_years
+                step_age_stage_features = age_out.age_stage_features
+                step_age_delta_32_stats = age_out.age_delta_32_stats
 
         transit_state = self.transits.state(date_or_dt, self._config)
         debug_009: dict[str, Any] | None = None
@@ -187,10 +230,17 @@ class Agent:
         if self.lifecycle is not None:
             s_g = global_sensitivity(self._identity_config.sensitivity_vector)
             self.lifecycle.update_lifecycle(transit_state.stress, resilience, s_g=s_g)
-        self.behavior.apply_transits(transit_state)
+        self.behavior.apply_transits(transit_state, memory_delta=memory_delta, age_delta_32=age_delta_32)
         sex = getattr(self._identity_config, "sex", None)
         E = getattr(self._identity_config, "sex_polarity_E", 0.0)
-        result = StepResult(sex=sex, sex_polarity_E=E, debug_009=debug_009)
+        result = StepResult(
+            sex=sex,
+            sex_polarity_E=E,
+            debug_009=debug_009,
+            age_years=step_age_years,
+            age_stage_features=step_age_stage_features,
+            age_delta_32_stats=step_age_delta_32_stats,
+        )
         self._last_step_result = result
         return result
 

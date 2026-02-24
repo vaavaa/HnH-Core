@@ -61,16 +61,22 @@ class BehavioralCore:
         """Current 32D state (updated by apply_transits)."""
         return self._current_vector
 
-    def apply_transits(self, transit_state: TransitState) -> None:
+    def apply_transits(
+        self,
+        transit_state: TransitState,
+        memory_delta: tuple[float, ...] | None = None,
+        age_delta_32: tuple[float, ...] | None = None,
+    ) -> None:
         """
-        Update current_vector from transit_state.bounded_delta and sensitivity from identity_config.
-        Delegates to assemble_state; memory_delta = zeros. Does not mutate base_vector.
+        Update current_vector from transit_state.bounded_delta and sensitivity.
+        Delegates to assemble_state with memory_delta and age_delta_32 (default zeros). Does not mutate base_vector.
         """
         sens = self._identity_config.sensitivity_vector
         params_final, _axis_final = assemble_state(
             self._base_vector,
             sens,
             transit_state.bounded_delta,
-            memory_delta=None,
+            memory_delta=memory_delta,
+            age_delta_32=age_delta_32,
         )
         self._current_vector = params_final
